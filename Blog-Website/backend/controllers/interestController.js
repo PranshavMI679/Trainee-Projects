@@ -1,12 +1,42 @@
 const { sequelize } = require('../config/db');
 const { QueryTypes } = require('sequelize');
 
+exports.saveInterests = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const userId = req.user.user_id;
+    const { categoryIds } = req.body;
+
+    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+      return res.status(400).json({ success: false, message: "Please select at least one interest" });
+    }
+
+    await sequelize.query(
+      'DELETE FROM "Interests" WHERE user_id = :userId',
+      { replacements: { userId }, type: QueryTypes.DELETE, transaction: t }
+    );
+
+    const values = categoryIds.map(id => `('${userId}', '${id}')`).join(',');
+    await sequelize.query(
+      `INSERT INTO "Interests" (user_id, category_id) VALUES ${values}`,
+      { type: QueryTypes.INSERT, transaction: t }
+    );
+
+    await t.commit();
+    res.status(200).json({ success: true, message: "Interests saved successfully" });
+  } catch (error) {
+    await t.rollback();
+    console.error('Save Interests Error:', error);
+    res.status(500).json({ success: false, message: "Error saving interests" });
+  }
+};
+
 exports.getFeed = async (req, res) => {
   try {
     const userId = req.user.user_id;
     const { categories } = req.query;
 
-    let categoryIds;
+    let categoryIds = [];
 
     if (categories) {
       categoryIds = categories.split(',');
@@ -18,12 +48,12 @@ exports.getFeed = async (req, res) => {
       categoryIds = interests.map(i => i.category_id);
     }
 
-    const whereClause = categoryIds.length > 0 
-      ? 'WHERE p.category_id IN (:categoryIds)' 
-      : '';
+    const hasFilters = categoryIds.length > 0;
+    const whereClause = hasFilters ? 'WHERE p.category_id IN (:categoryIds)' : '';
 
     const posts = await sequelize.query(
-      `SELECT p.*, u.name as author_name, c.name as category_name
+      `SELECT p.post_id, p.title, p.content, p.created_at, 
+              u.name as author_name, c.name as category_name
        FROM "BlogPosts" p
        JOIN "Users" u ON p.author_id = u.user_id
        JOIN "Categories" c ON p.category_id = c.category_id
@@ -35,9 +65,10 @@ exports.getFeed = async (req, res) => {
       }
     );
 
-    res.json({ success: true, posts });
+    res.json({ success: true, count: posts.length, posts });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching feed' });
+    console.error('Feed Error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching feed' });
   }
 };
 
@@ -46,15 +77,17 @@ exports.getFilterCategories = async (req, res) => {
     const userId = req.user.user_id;
 
     const categories = await sequelize.query(
-      `SELECT c.*, 
-       CASE WHEN ui.user_id IS NOT NULL THEN TRUE ELSE FALSE END as is_premarked
+      `SELECT c.category_id, c.name, 
+       CASE WHEN i.user_id IS NOT NULL THEN TRUE ELSE FALSE END as is_premarked
        FROM "Categories" c
-       LEFT JOIN "Interests" ui ON c.category_id = ui.category_id AND ui.user_id = :userId`,
+       LEFT JOIN "Interests" i ON c.category_id = i.category_id AND i.user_id = :userId
+       ORDER BY c.name ASC`,
       { replacements: { userId }, type: QueryTypes.SELECT }
     );
 
     res.json({ success: true, categories });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching categories' });
+    console.error('Category List Error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching categories' });
   }
 };

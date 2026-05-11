@@ -10,7 +10,10 @@ exports.registerUser = async (req, res) => {
 
     const existingUsers = await sequelize.query(
       'SELECT * FROM "Users" WHERE email = :email LIMIT 1',
-      { replacements: { email }, type: QueryTypes.SELECT }
+      { 
+        replacements: { email }, 
+        type: QueryTypes.SELECT 
+      }
     );
 
     if (existingUsers.length > 0) {
