@@ -1,21 +1,7 @@
-const { sequelize } = require('../config/db');
-const { QueryTypes } = require('sequelize');
-
-exports.getAllCategories = async (req, res) => {
-  try {
-    const categories = await sequelize.query(
-      'SELECT category_id, name FROM "Categories" ORDER BY name ASC',
-      { type: QueryTypes.SELECT }
-    );
-    res.status(200).json({ success: true, count: categories.length, categories });
-  } catch (error) {
-    console.error('Get All Categories Error:', error);
-    res.status(500).json({ success: false, message: "Error fetching categories" });
-  }
-};
+const Category = require('../models/category');
 
 exports.createCategory = async (req, res) => {
-  const t = await sequelize.transaction();
+  const t = await Category.sequelize.transaction();
   try {
     let { categories } = req.body;
 
@@ -23,40 +9,25 @@ exports.createCategory = async (req, res) => {
       categories = [req.body]; 
     }
 
-    if (categories.length === 0 || !categories[0].name) {
+    if (categories.length === 0 || (!categories[0].name && !categories[0].category_name)) {
       return res.status(400).json({ success: false, message: "Please provide category name(s)" });
     }
 
-    const values = categories.map(cat => `('${cat.name}')`).join(',');
+    const categoryRecords = categories.map(cat => ({
+      category_name: cat.name || cat.category_name
+    }));
 
-    await sequelize.query(
-      `INSERT INTO "Categories" (name) VALUES ${values} ON CONFLICT (name) DO NOTHING`,
-      { type: QueryTypes.INSERT, transaction: t }
-    );
+    await Category.bulkCreate(categoryRecords, {
+      ignoreDuplicates: true,
+      transaction: t
+    });
 
     await t.commit();
     res.status(201).json({ success: true, message: "Category(s) added successfully" });
-  } catch (error) {
+  } 
+  catch (error) {
     await t.rollback();
     console.error('Create Category Error:', error);
     res.status(500).json({ success: false, message: "Error creating category" });
   }
 };
-
-/*
-exports.getCategoryById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const category = await sequelize.query(
-      'SELECT category_id, name FROM "Categories" WHERE category_id = :id',
-      { replacements: { id }, type: QueryTypes.SELECT, plain: true }
-    );
-
-    if (!category) return res.status(404).json({ success: false, message: "Category not found" });
-    res.status(200).json({ success: true, category });
-  } catch (error) {
-    console.error('Get Category By ID Error:', error);
-    res.status(500).json({ success: false, message: "Error fetching category" });
-  }
-};
-*/

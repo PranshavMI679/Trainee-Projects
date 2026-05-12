@@ -72,6 +72,7 @@ exports.getFeed = async (req, res) => {
   }
 };
 
+/*
 exports.getFilterCategories = async (req, res) => {
   try {
     const userId = req.user.user_id;
@@ -91,3 +92,4 @@ exports.getFilterCategories = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error fetching categories' });
   }
 };
+*/
