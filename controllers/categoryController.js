@@ -43,6 +43,7 @@ exports.createCategory = async (req, res) => {
   }
 };
 
+/*
 exports.getCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -58,20 +59,4 @@ exports.getCategoryById = async (req, res) => {
     res.status(500).json({ success: false, message: "Error fetching category" });
   }
 };
-
-exports.seedCategories = async (req, res) => {
-  try {
-    const list = ['Technology', 'Programming', 'Wellness', 'Life', 'Society', 'Culture', 'Business'];
-    const values = list.map(name => `('${name}')`).join(',');
-
-    await sequelize.query(
-      `INSERT INTO "Categories" (name) VALUES ${values} ON CONFLICT (name) DO NOTHING`, 
-      { type: QueryTypes.INSERT }
-    );
-
-    res.status(201).json({ success: true, message: "Categories seeded" });
-  } catch (error) {
-    console.error('Seed Error:', error);
-    res.status(500).json({ success: false, message: "Seed failed" });
-  }
-};
+*/

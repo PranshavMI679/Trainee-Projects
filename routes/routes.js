@@ -8,7 +8,7 @@ const {userSchema} =require('../validations/auth.validation');
 
 const {registerUser, loginUser} = require('../controllers/authController');
 const {saveInterests, getFeed, getFilterCategories} =  require('../controllers/interestController');
-const {getAllCategories, getCategoryById, seedCategories, createCategory} =  require('../controllers/categoryController');
+const {getAllCategories, createCategory} =  require('../controllers/categoryController');
 
 //authController.js
 router.post('/auth/register', validator(userSchema), registerUser);
@@ -16,8 +16,7 @@ router.post('/auth/login', loginUser);
 
 //categoryController.js
 router.get('/', authMiddleware, getAllCategories);
-router.get('/:id', authMiddleware, getCategoryById);
-router.post('/seed', authMiddleware, isAdmin, seedCategories);
+//router.get('/:id', authMiddleware, getCategoryById);
 router.post('/', authMiddleware, isAdmin, createCategory);
 
 //interestController.js
