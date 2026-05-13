@@ -11,7 +11,7 @@ const {registerUser, loginUser} = require('../controllers/authController');
 const {saveInterests, getFeed} =  require('../controllers/interestController');
 const {createCategory} =  require('../controllers/categoryController');
 const {followingUser} = require('../controllers/followingController');
-const {createBlogPost} = require('../controllers/writeController');
+const {createBlogPost, editBlogDraft, submitBlogForApproval} = require('../controllers/writeController');
 
 //authController.js
 router.post('/auth/register', validator(userSchema), registerUser);
@@ -29,5 +29,7 @@ router.post('/follow', authMiddleware, followingUser);
 
 //writeController.js
 router.post('/blog', authMiddleware, uploadBlogImage, createBlogPost);
+router.put('/draft/:blog_id/edit', authMiddleware, uploadBlogImage, editBlogDraft);
+router.patch('/draft/:blog_id/submit', authMiddleware, submitBlogForApproval);
 
 module.exports = router;
