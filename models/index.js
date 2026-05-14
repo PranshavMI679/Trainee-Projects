@@ -9,7 +9,6 @@ const Feedback = require('./feedback');
 const Comment = require('./comment');
 const Category = require('./category');
 const BlogPost = require('./blog_post');
-const BlogApprovalRequest = require('./blog_approval_request');
 
 User.belongsToMany(User, { as: 'Followings', through: Following, foreignKey: 'follower_id', otherKey: 'user_id' });
 User.belongsToMany(User, { as: 'Followers', through: Following, foreignKey: 'user_id', otherKey: 'follower_id' });
@@ -39,17 +38,17 @@ Comment.belongsTo(User, { foreignKey: 'user_id' });
 Comment.hasMany(Comment, { as: 'Replies', foreignKey: 'parent_comment_id' });
 Comment.belongsTo(Comment, { as: 'Parent', foreignKey: 'parent_comment_id' });
 
-BlogPost.hasOne(BlogApprovalRequest, { foreignKey: 'blog_id' });
-BlogApprovalRequest.belongsTo(BlogPost, { foreignKey: 'blog_id' });
+BlogPost.hasMany(Feedback, { foreignKey: 'blog_id', onDelete: 'CASCADE' });
+Feedback.belongsTo(BlogPost, { foreignKey: 'blog_id' });
 
-User.hasMany(BlogApprovalRequest, { foreignKey: 'admin_id' });
-BlogApprovalRequest.belongsTo(User, { foreignKey: 'admin_id', as: 'Admin' });
+User.hasMany(Feedback, { foreignKey: 'feedback_given_by' });
+Feedback.belongsTo(User, { foreignKey: 'feedback_given_by', as: 'AdminFeedback' });
 
-BlogApprovalRequest.hasMany(Feedback, { foreignKey: 'request_id' });
-Feedback.belongsTo(BlogApprovalRequest, { foreignKey: 'request_id' });
+User.hasMany(BlogPost, { foreignKey: 'approved_by', as: 'ApprovedBlogs' });
+BlogPost.belongsTo(User, { foreignKey: 'approved_by', as: 'Approver' });
 
-User.hasMany(Feedback, { foreignKey: 'admin_id' });
-Feedback.belongsTo(User, { foreignKey: 'admin_id', as: 'AdminFeedback' });
+User.hasMany(BlogPost, { foreignKey: 'rechecked_by', as: 'RecheckedBlogs' });
+BlogPost.belongsTo(User, { foreignKey: 'rechecked_by', as: 'Rechecker' });
 
 module.exports = { 
   sequelize, 
@@ -61,6 +60,5 @@ module.exports = {
   Feedback, 
   Comment,
   Category,
-  BlogPost,
-  BlogApprovalRequest
+  BlogPost
 };

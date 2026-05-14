@@ -20,7 +20,7 @@ const BlogPost = sequelize.define('BlogPost', {
     allowNull: false
   },
   blog_image: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.ARRAY(DataTypes.STRING(255)),
     allowNull: true
   },
   content: {
@@ -31,6 +31,14 @@ const BlogPost = sequelize.define('BlogPost', {
     type: DataTypes.ENUM('draft', 'approval pending', 'approved', 'recheck', 'published'),
     defaultValue: 'draft',
     allowNull: false
+  },
+  approved_by: {
+  type: DataTypes.UUID,
+  allowNull: true 
+  },
+  rechecked_by: {
+  type: DataTypes.UUID,
+  allowNull: true 
   }
 }, {
   timestamps: true,

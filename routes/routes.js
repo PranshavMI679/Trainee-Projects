@@ -32,4 +32,7 @@ router.post('/blog', authMiddleware, uploadBlogImage, createBlogPost);
 router.put('/draft/:blog_id/edit', authMiddleware, uploadBlogImage, editBlogDraft);
 router.patch('/draft/:blog_id/submit', authMiddleware, submitBlogForApproval);
 
+//adminController.js
+
+
 module.exports = router;

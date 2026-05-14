@@ -7,11 +7,11 @@ const Feedback = sequelize.define('Feedback', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
-  request_id: {
+  blog_id: {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  admin_id: {
+  feedback_given_by: {
     type: DataTypes.UUID,
     allowNull: false,
   },

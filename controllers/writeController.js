@@ -1,5 +1,6 @@
 const Blog_Post = require('../models/blog_post'); 
 const Category = require('../models/category');
+const Feedback = require('../models/feedback');
 const { v4: uuidv4 } = require('uuid');
 
 const createBlogPost = async (req, res) => {
@@ -53,9 +54,9 @@ const editBlogDraft = async (req, res) => {
         const { category_name, blog_title, blog_image, content, status } = req.body;
 
         const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
-        if (!user_id) {
-            return res.status(401).json({ message: "Authentication failed. Token missing." });
-        }
+        // if (!user_id) {
+        //     return res.status(401).json({ message: "Authentication failed. Token missing." });
+        // }
 
         const post = await Blog_Post.findByPk(blog_id);
         if (!post) {
@@ -114,9 +115,9 @@ const submitBlogForApproval = async (req, res) => {
         const { blog_id } = req.params;
 
         const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
-        if (!user_id) {
-            return res.status(401).json({ message: "Authentication failed. Token missing." });
-        }
+        // if (!user_id) {
+        //     return res.status(401).json({ message: "Authentication failed. Token missing." });
+        // }
 
         const post = await Blog_Post.findByPk(blog_id);
         if (!post) {
