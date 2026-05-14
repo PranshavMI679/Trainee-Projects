@@ -12,6 +12,7 @@ const {saveInterests, getFeed} =  require('../controllers/interestController');
 const {createCategory} =  require('../controllers/categoryController');
 const {followingUser} = require('../controllers/followingController');
 const {createBlogPost, editBlogDraft, submitBlogForApproval} = require('../controllers/writeController');
+const {getPendingBlogs, recheckBlog} =  require('../controllers/adminController');
 
 //authController.js
 router.post('/auth/register', validator(userSchema), registerUser);
@@ -33,6 +34,7 @@ router.put('/draft/:blog_id/edit', authMiddleware, uploadBlogImage, editBlogDraf
 router.patch('/draft/:blog_id/submit', authMiddleware, submitBlogForApproval);
 
 //adminController.js
-
+router.get('/pending', authMiddleware, isAdmin, getPendingBlogs);
+router.post('/recheck/:blog_id', authMiddleware, isAdmin, recheckBlog);
 
 module.exports = router;

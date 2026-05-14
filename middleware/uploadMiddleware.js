@@ -15,7 +15,7 @@ const upload = multer({
     storage: multerS3({
         s3: s3,
         bucket: process.env.AWS_BUCKET_NAME,
-        acl: 'public-read',
+        //acl: 'public-read',
         metadata: function (req, file, cb) {
             cb(null, { fieldName: file.fieldname });
         },
@@ -37,6 +37,15 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-const uploadBlogImage = upload.single('blog_image');
+const uploadBlogImage = (req, res, next) => {
+    upload.array('blog_image', 5)(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            return res.status(400).json({ error: `Upload error: ${err.message}` });
+        } else if (err) {
+            return res.status(400).json({ error: err.message });
+        }
+        next();
+    });
+};
 
-module.exports = { uploadBlogImage };
+module.exports = { uploadBlogImage, s3};
