@@ -1,8 +1,5 @@
-const Blog_Post = require('../models/blog_post'); 
-const Category = require('../models/category');
+const { BlogPost, Feedback, User, Category } = require('../models');
 const { v4: uuidv4 } = require('uuid');
-
-const { BlogPost, Feedback, User } = require('../models');
 
 exports.getPendingBlogs = async (req, res) => {
   try {
@@ -84,11 +81,7 @@ exports.approveBlog = async (req, res) => {
     }
 
     blog.status = 'approved'; 
-    
-    // Optional: Add an approved_by / tracking column if present in your BlogPost schema
-    if ('approved_by' in blog || blog.hasOwnProperty('approved_by')) {
-       blog.approved_by = admin_id;
-    }
+    blog.approved_by = admin_id;
     
     await blog.save();
 
@@ -98,7 +91,8 @@ exports.approveBlog = async (req, res) => {
       updated_blog: {
         blog_id: blog.blog_id,
         blog_title: blog.blog_title,
-        status: blog.status
+        status: blog.status,
+        approved_by: blog.approved_by
       }
     });
 

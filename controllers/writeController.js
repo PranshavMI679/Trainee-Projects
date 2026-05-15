@@ -54,19 +54,21 @@ exports.createBlogPost = async (req, res) => {
     }
 };
 
-exports.editBlogDraft = async (req, res) => {
+exports.editBlog = async (req, res) => {
     try {
         const { blog_id } = req.params;
         const { category_name, blog_title, blog_image, content } = req.body;
         const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
 
-        const post = await Blog_Post.findByPk(blog_id);
+        const post = await BlogPost.findByPk(blog_id);
         if (!post) {
-            return res.status(404).json({ message: "Target blog post draft could not be found." });
+            return res.status(404).json({ message: "Target blog post could not be found." });
         }
 
-        if (post.status !== 'draft' && post.status !== 'approval pending') {
-            return res.status(403).json({ message: `Action denied. You can only edit drafts or pending posts. Current status is '${post.status}'.` });
+        if (post.status !== 'draft' && post.status !== 'approval pending' && post.status !== 'recheck') {
+            return res.status(403).json({ 
+                message: `Action denied. You can only edit drafts, pending, or recheck posts. Current status is '${post.status}'.` 
+            });
         }
 
         let category_id = post.category_id;
@@ -86,7 +88,7 @@ exports.editBlogDraft = async (req, res) => {
         }
 
         let currentStatus = post.status;
-        if (currentStatus === 'approval pending') {
+        if (currentStatus === 'approval pending' || currentStatus === 'recheck') {
             currentStatus = 'draft';
         }
 
@@ -98,23 +100,23 @@ exports.editBlogDraft = async (req, res) => {
 
         await post.save();
         
-        const responseMessage = currentStatus === 'draft' && post.status === 'draft' 
-            ? "Blog post updated successfully."
-            : "Blog post updated successfully and reverted to draft status until resubmitted.";
+        const responseMessage = post.status === 'draft' && (post.status !== post.previous('status'))
+            ? "Blog post updated successfully and reverted to draft status until resubmitted."
+            : "Blog post updated successfully.";
 
         return res.status(200).json({ message: responseMessage, data: post });
-    } catch (error) {
+    } 
+    catch (error) {
         return res.status(500).json({ message: "Internal server error", error: error.message });
     }
 };
-
 
 exports.submitBlogForApproval = async (req, res) => {
     try {
         const { blog_id } = req.params;
         const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
 
-        const post = await Blog_Post.findByPk(blog_id);
+        const post = await BlogPost.findByPk(blog_id);
         if (!post) {
             return res.status(404).json({ message: "Blog post record could not be found." });
         }
@@ -182,4 +184,36 @@ exports.getFeedback = async (req, res) => {
   }
 };
 
+exports.publishBlog = async (req, res) => {
+    try {
+        const { blog_id } = req.params;
+        const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
 
+        const post = await BlogPost.findByPk(blog_id);
+        if (!post) {
+            return res.status(404).json({ message: "Blog post record could not be found." });
+        }
+
+        if (post.status !== 'approved') {
+            return res.status(400).json({ 
+                message: `Cannot submit. Only approved posts can be published. Current status is '${post.status}'.` 
+            });
+        }
+
+        post.status = 'published';
+        await post.save();
+
+        return res.status(200).json({
+            message: "Blog post published successfully.",
+            data: {
+                blog_id: post.blog_id,
+                blog_title: post.blog_title,
+                status: post.status,
+                updated_at: post.updated_at
+            }
+        }); 
+    } 
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error: error.message });
+    }
+};

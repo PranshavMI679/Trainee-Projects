@@ -1,7 +1,4 @@
-const Interest = require('../models/interest');
-const BlogPost = require('../models/blog_post');
-const User = require('../models/user');
-const Category = require('../models/category');
+const {Interest, BlogPost, User, Category} = require('../models/');
 const { Op } = require('sequelize');
 
 exports.saveInterests = async (req, res) => {
@@ -46,7 +43,7 @@ exports.saveInterests = async (req, res) => {
   }
 };
 
-exports.getFeed = async (req, res) => {
+exports.forYouFeed = async (req, res) => {
   try {
     const userId = req.user.user_id;
     const { categories } = req.query;
