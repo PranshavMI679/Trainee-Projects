@@ -10,7 +10,7 @@ const {userSchema} =require('../validations/auth.validation');
 const {registerUser, loginUser} = require('../controllers/authController');
 const {saveInterests, forYouFeed} =  require('../controllers/interestController');
 const {createCategory} =  require('../controllers/categoryController');
-const {followingUser} = require('../controllers/followingController');
+const {followingUser, featuredFeed} = require('../controllers/followingController');
 const {createBlogPost, editBlog, submitBlogForApproval, getFeedback, publishBlog} = require('../controllers/writeController');
 const {getPendingBlogs, recheckBlog, approveBlog} =  require('../controllers/adminController');
 
@@ -27,6 +27,7 @@ router.get('/for-you', authMiddleware, forYouFeed);
 
 //followingController.js
 router.post('/follow', authMiddleware, followingUser);
+router.get('/featured', authMiddleware, featuredFeed);
 
 //writeController.js
 router.post('/blog', authMiddleware, uploadBlogImage, createBlogPost);

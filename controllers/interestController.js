@@ -1,4 +1,4 @@
-const {Interest, BlogPost, User, Category} = require('../models/');
+const {Interest, BlogPost, User, Category} = require('../models');
 const { Op } = require('sequelize');
 
 exports.saveInterests = async (req, res) => {
@@ -45,20 +45,20 @@ exports.saveInterests = async (req, res) => {
 
 exports.forYouFeed = async (req, res) => {
   try {
-    const userId = req.user.user_id;
+    const userId = req.user?.id || req.user?.user_id || req.user?.userId;
     const { categories } = req.query;
 
     let targetCategoryIds = [];
 
     if (categories) {
-      targetCategoryIds = categories.split(',');
+      targetCategoryIds = categories.split(',').map(id => id.trim());
     } else {
       const userInterest = await Interest.findByPk(userId);
       targetCategoryIds = userInterest ? userInterest.category_ids : [];
     }
 
     const queryOptions = {
-      attributes: ['blog_id', 'blog_title', 'content', 'created_at'],
+      attributes: ['blog_id', 'blog_title', 'blog_image', 'content'],
       include: [
         { model: User, attributes: ['name'] },
         { model: Category, attributes: ['category_name'] }
@@ -68,15 +68,25 @@ exports.forYouFeed = async (req, res) => {
 
     if (targetCategoryIds.length > 0) {
       queryOptions.where = {
+        status: 'published',
         category_id: { [Op.in]: targetCategoryIds }
+      };
+    } else {
+      queryOptions.where = {
+        status: 'published'
       };
     }
 
     const posts = await BlogPost.findAll(queryOptions);
 
-    res.json({ success: true, count: posts.length, posts });
+    return res.status(200).json({ 
+      success: true, 
+      count: posts.length, 
+      posts 
+    });
+    
   } catch (error) {
     console.error('Feed Error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching feed' });
+    return res.status(500).json({ success: false, message: 'Error fetching feed', error: error.message });
   }
 };
