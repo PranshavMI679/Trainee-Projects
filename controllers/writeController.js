@@ -1,12 +1,10 @@
-const Blog_Post = require('../models/blog_post'); 
-const Category = require('../models/category');
-const Feedback = require('../models/feedback');
-const { getPresignedUrl } = require('../config/s3')
+const { BlogPost, Category, Feedback } = require('../models');
+const { getPresignedUrl } = require('../config/s3');
 const { v4: uuidv4 } = require('uuid');
 
-const createBlogPost = async (req, res) => {
+exports.createBlogPost = async (req, res) => {
     try {
-        const { category_name, blog_title, blog_image, content, status } = req.body;
+        const { category_name, blog_title, blog_image, content} = req.body;
 
         const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
 
@@ -28,7 +26,6 @@ const createBlogPost = async (req, res) => {
         const categoryRecord = await Category.findOne({
             where: { category_name: category_name.trim() }
         });
-
         if (!categoryRecord) {
             return res.status(404).json({ 
                 message: `Category '${category_name}' does not exist. Please use an existing category.` 
@@ -37,9 +34,6 @@ const createBlogPost = async (req, res) => {
 
         const category_id = categoryRecord.category_id;
 
-        const allowedStatuses = ['draft', 'approval pending', 'approved', 'recheck', 'published'];
-        const currentStatus = status && allowedStatuses.includes(status) ? status : 'draft';
-
         const newPost = await Blog_Post.create({
             blog_id: uuidv4(),
             user_id,
@@ -47,7 +41,7 @@ const createBlogPost = async (req, res) => {
             blog_title,
             blog_image: imageKeys,
             content,
-            status: currentStatus
+            status: 'draft'
         });
 
         return res.status(201).json({
@@ -60,11 +54,10 @@ const createBlogPost = async (req, res) => {
     }
 };
 
-const editBlogDraft = async (req, res) => {
+exports.editBlogDraft = async (req, res) => {
     try {
         const { blog_id } = req.params;
-        const { category_name, blog_title, blog_image, content, status } = req.body;
-
+        const { category_name, blog_title, blog_image, content } = req.body;
         const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
 
         const post = await Blog_Post.findByPk(blog_id);
@@ -72,21 +65,13 @@ const editBlogDraft = async (req, res) => {
             return res.status(404).json({ message: "Target blog post draft could not be found." });
         }
 
-        if (post.status !== 'draft' || 'approval_pending') {
-            return res.status(403).json({ 
-                message: `Action denied. Blog status must be draft. Current status is '${post.status}'.` 
-            });
-        }
-
-        if (post.user_id !== user_id) {
-            return res.status(403).json({ message: "Access denied. You do not own this blog post draft." });
+        if (post.status !== 'draft' && post.status !== 'approval pending') {
+            return res.status(403).json({ message: `Action denied. You can only edit drafts or pending posts. Current status is '${post.status}'.` });
         }
 
         let category_id = post.category_id;
         if (category_name && category_name.trim() !== "") {
-            const categoryRecord = await Category.findOne({
-                where: { category_name: category_name.trim() }
-            });
+            const categoryRecord = await Category.findOne({ where: { category_name: category_name.trim() } });
             if (!categoryRecord) {
                 return res.status(404).json({ message: `Category '${category_name}' does not exist.` });
             }
@@ -94,18 +79,15 @@ const editBlogDraft = async (req, res) => {
         }
 
         let finalImagesArray = post.blog_image || [];
-        
         if (req.files && req.files.length > 0) {
             finalImagesArray = req.files.map(file => file.key);
- 
         } else if (blog_image) {
             finalImagesArray = Array.isArray(blog_image) ? blog_image : [blog_image];
         }
 
         let currentStatus = post.status;
-        if (status) {
-            const allowedAuthorStatuses = ['draft'];
-            currentStatus = allowedAuthorStatuses.includes(status) ? status : post.status;
+        if (currentStatus === 'approval pending') {
+            currentStatus = 'draft';
         }
 
         post.category_id = category_id;
@@ -115,18 +97,19 @@ const editBlogDraft = async (req, res) => {
         post.status = currentStatus;
 
         await post.save();
+        
+        const responseMessage = currentStatus === 'draft' && post.status === 'draft' 
+            ? "Blog post updated successfully."
+            : "Blog post updated successfully and reverted to draft status until resubmitted.";
 
-        return res.status(200).json({
-            message: "Blog post draft updated successfully.",
-            data: post
-        });
-    } 
-    catch (error) {
+        return res.status(200).json({ message: responseMessage, data: post });
+    } catch (error) {
         return res.status(500).json({ message: "Internal server error", error: error.message });
     }
 };
 
-const submitBlogForApproval = async (req, res) => {
+
+exports.submitBlogForApproval = async (req, res) => {
     try {
         const { blog_id } = req.params;
         const user_id = req.user?.id || req.user?.user_id || req.user?.userId;
@@ -160,8 +143,43 @@ const submitBlogForApproval = async (req, res) => {
     }
 };
 
-module.exports = {
-    createBlogPost,
-    editBlogDraft,
-    submitBlogForApproval
+exports.getFeedback = async (req, res) => {
+  const { blog_id } = req.params;
+  const current_user_id = req.user?.id || req.user?.user_id || req.user?.userId;
+
+  try {
+    const blog = await BlogPost.findByPk(blog_id);
+    if (!blog) {
+      return res.status(404).json({ success: false, message: 'Blog post not found' });
+    }
+
+    const feedback = await Feedback.findOne({
+      where: { blog_id: blog_id },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!feedback) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No admin feedback has been submitted for this blog post yet.' 
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Feedback for this blog draft.',
+      updated_blog: {
+        blog_id: blog.blog_id,
+        blog_title: blog.blog_title,
+        status: blog.status,
+        rechecked_by: blog.rechecked_by
+      },
+      feedback_details: feedback
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 };
+
+

@@ -65,3 +65,45 @@ exports.recheckBlog = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+exports.approveBlog = async (req, res) => {
+  const { blog_id } = req.params;
+  const admin_id = req.user?.id || req.user?.user_id || req.user?.userId;
+
+  try {
+    const blog = await BlogPost.findByPk(blog_id);
+    if (!blog) {
+      return res.status(404).json({ success: false, message: 'Blog post not found' });
+    }
+
+    if (blog.status !== 'approval pending') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot approve a blog that is currently in '${blog.status}' status` 
+      });
+    }
+
+    blog.status = 'approved'; 
+    
+    // Optional: Add an approved_by / tracking column if present in your BlogPost schema
+    if ('approved_by' in blog || blog.hasOwnProperty('approved_by')) {
+       blog.approved_by = admin_id;
+    }
+    
+    await blog.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Blog post has been successfully approved.',
+      updated_blog: {
+        blog_id: blog.blog_id,
+        blog_title: blog.blog_title,
+        status: blog.status
+      }
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
