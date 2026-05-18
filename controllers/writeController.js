@@ -34,7 +34,7 @@ exports.createBlogPost = async (req, res) => {
 
         const category_id = categoryRecord.category_id;
 
-        const newPost = await Blog_Post.create({
+        const newPost = await BlogPost.create({
             blog_id: uuidv4(),
             user_id,
             category_id,
