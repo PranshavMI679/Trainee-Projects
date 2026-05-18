@@ -13,6 +13,7 @@ const {createCategory} =  require('../controllers/categoryController');
 const {followingUser, featuredFeed} = require('../controllers/followingController');
 const {createBlogPost, editBlog, submitBlogForApproval, getFeedback, publishBlog} = require('../controllers/writeController');
 const {getPendingBlogs, recheckBlog, approveBlog} =  require('../controllers/adminController');
+const {blogReaction} = require('../controllers/reactionController');
 
 //authController.js
 router.post('/auth/register', validator(userSchema), registerUser);
@@ -40,5 +41,11 @@ router.patch('/:blog_id/publish', authMiddleware, publishBlog)
 router.get('/pending', authMiddleware, isAdmin, getPendingBlogs);
 router.post('/recheck/:blog_id', authMiddleware, isAdmin, recheckBlog);
 router.post('/approve/:blog_id', authMiddleware, isAdmin, approveBlog);
+
+//reactionController.js
+router.post('/blog/:blog_id/reaction', authMiddleware, blogReaction);
+
+//commentController.js
+
 
 module.exports = router;
