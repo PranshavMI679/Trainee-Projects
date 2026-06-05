@@ -38,7 +38,7 @@ const startServer = async () => {
     await sequelize.sync({ alter: false }); 
     console.log('Database synchronized successfully.');
 
-    httpServer.listen(PORT, () => {
+    app.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
     });
   } catch (error) {
