@@ -30,11 +30,11 @@ const Form = sequelize.define('Form', {
     allowNull: false
   },
   gender: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.ENUM('Male', 'Female', 'Others'),
     allowNull: false
   },
   phone: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(10),
     allowNull: false
   },
   email: { 
