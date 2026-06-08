@@ -4,7 +4,6 @@ const { sequelize } = require('../config/db');
 const FormConfig = sequelize.define('FormConfig', {
   config_code: {
     type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
     allowNull: false,
     primaryKey: true 
   },
@@ -15,18 +14,6 @@ const FormConfig = sequelize.define('FormConfig', {
   },
   client_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    autoIncrement: true,
-    unique: true
-  },
-  client_code: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    allowNull: false,
-    unique: true
-  },
-  client_name: {
-    type: DataTypes.STRING(100),
     allowNull: false
   },
   label: {

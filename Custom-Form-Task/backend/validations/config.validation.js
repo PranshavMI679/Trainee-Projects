@@ -53,6 +53,14 @@ const singleFieldSchema = Joi.object({
     .messages({
       'number.base': ErrorMessages.VALIDATION.FIELD_LENGTH_BASE,
       'number.integer': ErrorMessages.VALIDATION.FIELD_LENGTH_INTEGER
+    }),
+
+  options: Joi.array()
+    .items(Joi.string().trim().required())
+    .optional()
+    .allow(null)
+    .messages({
+      'array.base': 'Options must be a valid array list of strings.'
     })
 });
 
@@ -60,10 +68,8 @@ const configSchema = Joi.object({
   client_name: Joi.string()
     .trim()
     .max(100)
-    .required()
+    .optional()
     .messages({
-      'string.empty': ErrorMessages.CLIENT.NAME_REQUIRED,
-      'any.required': ErrorMessages.CLIENT.NAME_REQUIRED,
       'string.max': ErrorMessages.VALIDATION.CLIENT_NAME_TOO_LONG
     }),
 

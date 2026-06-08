@@ -1,4 +1,4 @@
-const { FormConfig, Form, sequelize } = require('../models');
+const { Client, FormConfig, Form, sequelize } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 const { v4: uuidv4 } = require('uuid');
@@ -7,14 +7,31 @@ exports.createFormLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const { client_name, fields } = req.body;
+    const { client_code } = req.params;
+
+    let targetClient = null;
+
+    if (client_code && client_code !== 'new') {
+      targetClient = await Client.findOne({ where: { client_code } });
+      if (!targetClient) {
+        await t.rollback();
+        return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+      }
+    }
+
+    if (!targetClient) {
+      if (!client_name || client_name.trim() === '') {
+        await t.rollback();
+        return next(new AppError(ErrorMessages.CLIENT.NAME_REQUIRED, 400));
+      }
+      targetClient = await Client.create({ client_name }, { transaction: t });
+    }
 
     const generatedConfigCode = uuidv4();
-    const generatedClientCode = uuidv4();
 
     const bulkInsertPayload = fields.map(field => ({
       config_code: generatedConfigCode,
-      client_code: generatedClientCode,
-      client_name,
+      client_id: targetClient.client_id,
       key: field.key,
       label: field.label,
       type: field.type,
@@ -22,22 +39,17 @@ exports.createFormLayout = async (req, res, next) => {
       length: field.length || null
     }));
 
-    const createdRecords = await FormConfig.bulkCreate(bulkInsertPayload, { 
-      transaction: t,
-      returning: true 
-    });
+    await FormConfig.bulkCreate(bulkInsertPayload, { transaction: t });
 
     await t.commit();
-
-    const assignedClientId = createdRecords.client_id;
 
     return res.status(201).json({
       success: true,
       message: "Form layout configuration template created successfully.",
       config_code: generatedConfigCode,
-      client_id: assignedClientId,
-      client_code: generatedClientCode,
-      client_name,
+      client_id: targetClient.client_id,
+      client_code: targetClient.client_code,
+      client_name: targetClient.client_name,
       fields_count: fields.length
     });
   } catch (error) {
@@ -56,9 +68,7 @@ exports.getClientLayout = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const targetClientId = layouts.client_id;
-    const targetClientCode = layouts.client_code;
-    const targetClientName = layouts.client_name;
+    const targetClient = await Client.findOne({ where: { client_id: layouts[0].client_id } });
 
     const formattedFields = layouts.map(l => ({
       key: l.key,
@@ -70,9 +80,9 @@ exports.getClientLayout = async (req, res, next) => {
 
     return res.status(200).json({
       config_code,
-      client_id: targetClientId,
-      client_code: targetClientCode,
-      client_name: targetClientName,
+      client_id: targetClient ? targetClient.client_id : null,
+      client_code: targetClient ? targetClient.client_code : null,
+      client_name: targetClient ? targetClient.client_name : null,
       fields: formattedFields
     });
   } catch (error) {
@@ -92,19 +102,17 @@ exports.editConfiglayout = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const originalClientId = existingLayouts.client_id;
-    const originalClientCode = existingLayouts.client_code;
+    const currentClientId = existingLayouts[0].client_id;
 
-    await FormConfig.destroy({
-      where: { config_code },
-      transaction: t
-    });
+    if (client_name) {
+      await Client.update({ client_name }, { where: { client_id: currentClientId }, transaction: t });
+    }
+
+    await FormConfig.destroy({ where: { config_code }, transaction: t });
 
     const updatedPayload = fields.map(field => ({
-      config_code, 
-      client_id: originalClientId,
-      client_code: originalClientCode,
-      client_name,
+      config_code,
+      client_id: currentClientId,
       key: field.key,
       label: field.label,
       type: field.type,
@@ -116,12 +124,14 @@ exports.editConfiglayout = async (req, res, next) => {
 
     await t.commit();
 
+    const targetClient = await Client.findOne({ where: { client_id: currentClientId } });
+
     return res.status(200).json({
       success: true,
       message: "Form configuration layout template parameters updated successfully.",
       config_code,
-      client_id: originalClientId,
-      client_code: originalClientCode,
+      client_id: targetClient.client_id,
+      client_code: targetClient.client_code,
       updated_fields_count: fields.length
     });
   } catch (error) {
@@ -135,10 +145,7 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
   try {
     const { config_code, key } = req.params;
 
-    const deletedCount = await FormConfig.destroy({
-      where: { config_code, key },
-      transaction: t
-    });
+    const deletedCount = await FormConfig.destroy({ where: { config_code, key }, transaction: t });
 
     if (deletedCount === 0) {
       await t.rollback();
@@ -146,20 +153,15 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     }
 
     await Form.update(
-      {
-        custom_values: sequelize.literal(`custom_values - '${key}'`)
-      },
-      {
-        where: { config_code },
-        transaction: t
-      }
+      { custom_values: sequelize.literal(`custom_values - '${key}'`) },
+      { where: { config_code }, transaction: t }
     );
 
     await t.commit();
 
     return res.status(200).json({
       success: true,
-      message: `Custom form field key is deleted successfully.`
+      message: `Custom form field key '${key}' and all its corresponding historical data answers were cleared successfully.`
     });
   } catch (error) {
     await t.rollback();

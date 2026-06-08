@@ -5,7 +5,6 @@ module.exports = {
     await queryInterface.createTable('form_configs', {
       config_code: {
         type: Sequelize.UUID,
-        defaultValue: Sequelize.UUIDV4,
         allowNull: false,
         primaryKey: true
       },
@@ -15,12 +14,10 @@ module.exports = {
         primaryKey: true
       },
       client_id: {
-        type: Sequelize.STRING(50),
-        allowNull: false
-      },
-      client_name: {
-        type: Sequelize.STRING(100),
-        allowNull: false
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       },
       label: {
         type: Sequelize.STRING(100),
@@ -52,7 +49,8 @@ module.exports = {
     });
 
     await queryInterface.addIndex('form_configs', ['config_code'], {
-      name: 'idx_form_configs_config_code'
+      name: 'idx_form_configs_config_code',
+      unique: true
     });
   },
 

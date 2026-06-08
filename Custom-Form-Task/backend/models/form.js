@@ -11,7 +11,7 @@ const Form = sequelize.define('Form', {
   employee_id: {
     type: DataTypes.INTEGER, 
     autoIncrement: true,
-    unique: true,
+    unique: true
   },
   config_code: {
     type: DataTypes.UUID,
@@ -24,7 +24,7 @@ const Form = sequelize.define('Form', {
   email: { 
     type: DataTypes.STRING(255), 
     allowNull: false, 
-    unique: true,
+    unique: true
   },
   custom_values: {
     type: DataTypes.JSONB,
