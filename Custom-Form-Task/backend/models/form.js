@@ -1,23 +1,41 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const { sequelize } = require('../config/db');
 
 const Form = sequelize.define('Form', {
-  id: { 
+  employee_code: { 
+    type: DataTypes.UUID, 
+    defaultValue: DataTypes.UUIDV4, 
+    allowNull: false,
+    primaryKey: true      
+  },
+  employee_id: {
     type: DataTypes.INTEGER, 
-    primaryKey: true, 
-    autoIncrement: true
-    },
-  name: { 
-    type: DataTypes.STRING, 
-    allowNull: false 
-    },
+    autoIncrement: true,
+    unique: true,
+  },
+  config_code: {
+    type: DataTypes.UUID,
+    allowNull: false
+  },
+  name: {
+    type: DataTypes.STRING(50),
+    allowNull: false
+  },
   email: { 
-    type: DataTypes.STRING, 
+    type: DataTypes.STRING(255), 
     allowNull: false, 
-    unique: true 
-}
+    unique: true,
+  },
+  custom_values: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: {}
+  }
 }, { 
-    timestamps: true 
+  tableName: 'forms',
+  timestamps: true, 
+  createdAt: 'created_at', 
+  updatedAt: 'updated_at' 
 });
 
-module.exports = Employee;
+module.exports = Form;
