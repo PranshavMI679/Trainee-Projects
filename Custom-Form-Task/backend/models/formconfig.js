@@ -8,18 +8,26 @@ const FormConfig = sequelize.define('FormConfig', {
     allowNull: false,
     primaryKey: true 
   },
-  client_id: {
-    type: DataTypes.STRING(50),
-    allowNull: false
-  },
-  client_name: {
-    type: DataTypes.STRING(100),
-    allowNull: false
-  },
   key: {
     type: DataTypes.STRING(100),
     allowNull: false,
     primaryKey: true
+  },
+  client_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    autoIncrement: true,
+    unique: true
+  },
+  client_code: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    allowNull: false,
+    unique: true
+  },
+  client_name: {
+    type: DataTypes.STRING(100),
+    allowNull: false
   },
   label: {
     type: DataTypes.STRING(100),
