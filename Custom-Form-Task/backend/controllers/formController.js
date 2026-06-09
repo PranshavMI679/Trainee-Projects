@@ -43,7 +43,8 @@ exports.getFormLayout = async (req, res, next) => {
         custom_values: dynamicCustomFields 
       }
     });
-  } catch (error) {
+  } 
+  catch (error) {
     return next(error);
   }
 };
@@ -79,7 +80,8 @@ exports.getAllDetails = async (req, res, next) => {
     }
 
     return res.status(200).json(payload);
-  } catch (error) {
+  } 
+  catch (error) {
     return next(error);
   }
 };
@@ -112,7 +114,8 @@ exports.getEmployeeDetails = async (req, res, next) => {
       email: emp.email,
       config: configMap
     });
-  } catch (error) {
+  } 
+  catch (error) {
     return next(error);
   }
 };
@@ -153,7 +156,8 @@ exports.enterDetails = async (req, res, next) => {
       email: record.email,
       config: formattedConfig
     });
-  } catch (error) {
+  } 
+  catch (error) {
     return next(error);
   }
 };

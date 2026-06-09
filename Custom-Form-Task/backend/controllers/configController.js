@@ -136,12 +136,13 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     }
 
     const fieldKey = existingLayout.key;
+    const currentClientId = existingLayout.client_id;
 
     await FormConfig.destroy({ where: { config_code }, transaction: t });
 
     await Form.update(
       { custom_values: sequelize.literal(`custom_values - '${fieldKey}'`) },
-      { where: { config_code }, transaction: t }
+      { where: { client_id: currentClientId }, transaction: t }
     );
 
     await t.commit();
@@ -155,3 +156,4 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     return next(error);
   }
 };
+
