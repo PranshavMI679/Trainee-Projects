@@ -28,7 +28,10 @@ exports.getFormLayout = async (req, res, next) => {
         type: f.type,
         is_required: f.is_required,
         length: f.length,
-        value: null
+        options: f.options, 
+        value: f.type.toLowerCase().replace(/[^a-z0-9]/g, '') === 'currency' 
+          ? { value: null, denomination: null } 
+          : null
       };
     });
 
@@ -43,8 +46,7 @@ exports.getFormLayout = async (req, res, next) => {
         custom_values: dynamicCustomFields 
       }
     });
-  } 
-  catch (error) {
+  } catch (error) {
     return next(error);
   }
 };
@@ -55,33 +57,44 @@ exports.getAllDetails = async (req, res, next) => {
       order: [['employee_id', 'ASC']]
     });
 
-    const payload = [];
+    if (entries.length === 0) {
+      return res.status(200).json([]);
+    }
 
-    for (const item of entries) {
-      const blueprints = await FormConfig.findAll({ 
-        where: { client_id: item.client_id } 
-      });
+    const clientIds = [...new Set(entries.map(item => item.client_id))];
+    const allBlueprints = await FormConfig.findAll({
+      where: { client_id: clientIds }
+    });
 
-      const configMap = blueprints.map(b => ({
+    const blueprintMap = {};
+    allBlueprints.forEach(b => {
+      if (!blueprintMap[b.client_id]) blueprintMap[b.client_id] = [];
+      blueprintMap[b.client_id].push(b);
+    });
+
+    const payload = entries.map(item => {
+      const clientBlueprints = blueprintMap[item.client_id] || [];
+
+      const configMap = clientBlueprints.map(b => ({
         config_code: b.config_code,
         label: b.label,
         key: b.key,
-        value: item.custom_values && item.custom_values[b.key] !== undefined ? item.custom_values[b.key] : null,
-        type: b.type
+        type: b.type,
+        options: b.options, 
+        value: item.custom_values && item.custom_values[b.key] !== undefined ? item.custom_values[b.key] : null
       }));
 
-      payload.push({
+      return {
         id: item.employee_id,
         employee_code: item.employee_code,
         name: item.name,
         email: item.email,
         config: configMap
-      });
-    }
+      };
+    });
 
     return res.status(200).json(payload);
-  } 
-  catch (error) {
+  } catch (error) {
     return next(error);
   }
 };
@@ -103,8 +116,9 @@ exports.getEmployeeDetails = async (req, res, next) => {
       config_code: b.config_code,
       label: b.label,
       key: b.key,
-      value: emp.custom_values && emp.custom_values[b.key] !== undefined ? emp.custom_values[b.key] : null,
-      type: b.type
+      type: b.type,
+      options: b.options,
+      value: emp.custom_values && emp.custom_values[b.key] !== undefined ? emp.custom_values[b.key] : null
     }));
 
     return res.status(200).json({
@@ -114,8 +128,7 @@ exports.getEmployeeDetails = async (req, res, next) => {
       email: emp.email,
       config: configMap
     });
-  } 
-  catch (error) {
+  } catch (error) {
     return next(error);
   }
 };
@@ -144,6 +157,7 @@ exports.enterDetails = async (req, res, next) => {
       label: field.label,
       key: field.key,
       type: field.type,
+      options: field.options,
       value: custom_values && custom_values[field.key] !== undefined ? custom_values[field.key] : null
     }));
 
@@ -156,8 +170,7 @@ exports.enterDetails = async (req, res, next) => {
       email: record.email,
       config: formattedConfig
     });
-  } 
-  catch (error) {
+  } catch (error) {
     return next(error);
   }
 };

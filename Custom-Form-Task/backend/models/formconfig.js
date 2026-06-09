@@ -32,6 +32,11 @@ const FormConfig = sequelize.define('FormConfig', {
   length: {
     type: DataTypes.INTEGER,
     allowNull: true
+  },
+  options: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: null,
   }
 }, {
   tableName: 'form_configs',

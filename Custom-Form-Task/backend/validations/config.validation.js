@@ -1,6 +1,23 @@
 const Joi = require('joi');
 const ErrorMessages = require('../utils/errorMessages');
 
+const VALID_TYPES = [
+  'singleline', 'Single Line',
+  'multiline', 'Multi-Line',
+  'email', 'Email',
+  'dropdown', 'Dropdown',
+  'checkbox', 'Checkbox',
+  'radio', 'Radio',
+  'date', 'Date',
+  'datetime', 'Date/Time',
+  'number', 'Number',
+  'decimal', 'Decimal',
+  'percent', 'Percent',
+  'currency', 'Currency',
+  'phone', 'Phone',
+  'url', 'URL'
+];
+
 const singleFieldSchema = Joi.object({
   key: Joi.string()
     .trim()
@@ -28,12 +45,12 @@ const singleFieldSchema = Joi.object({
 
   type: Joi.string()
     .trim()
-    .min(1)
-    .max(50)
+    .valid(...VALID_TYPES)
     .required()
     .messages({
       'string.empty': ErrorMessages.VALIDATION.FIELD_TYPE_REQUIRED,
-      'any.required': ErrorMessages.VALIDATION.FIELD_TYPE_REQUIRED
+      'any.required': ErrorMessages.VALIDATION.FIELD_TYPE_REQUIRED,
+      'any.only': 'Requested field type must match one of the 14 approved UI datatypes.'
     }),
 
   is_required: Joi.boolean()
@@ -57,8 +74,15 @@ const singleFieldSchema = Joi.object({
 
   options: Joi.array()
     .items(Joi.string().trim().required())
-    .optional()
     .allow(null)
+    .optional()
+    .when('type', {
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection'),
+      then: Joi.array().min(1).required().messages({
+        'any.required': 'Selection lists (Dropdown/Radio) require at least one configured option entry.'
+      }),
+      otherwise: Joi.array().optional()
+    })
     .messages({
       'array.base': 'Options must be a valid array list of strings.'
     })
@@ -107,9 +131,11 @@ const editFieldSchema = Joi.object({
 
   type: Joi.string()
     .trim()
-    .min(1)
-    .max(50)
-    .optional(),
+    .valid(...VALID_TYPES)
+    .optional()
+    .messages({
+      'any.only': 'Requested field type must match one of the 14 approved UI datatypes.'
+    }),
 
   is_required: Joi.boolean()
     .optional()
@@ -130,8 +156,13 @@ const editFieldSchema = Joi.object({
 
   options: Joi.array()
     .items(Joi.string().trim().required())
-    .optional()
     .allow(null)
+    .optional()
+    .when('type', {
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection'),
+      then: Joi.array().min(1).required(),
+      otherwise: Joi.array().optional()
+    })
 }).min(1);
 
 module.exports = { 

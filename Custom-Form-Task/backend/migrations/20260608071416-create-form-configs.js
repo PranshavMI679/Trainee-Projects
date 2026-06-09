@@ -16,6 +16,7 @@ module.exports = {
       client_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
+        
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE'
       },
@@ -36,6 +37,11 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true
       },
+      options: {
+        type: Sequelize.JSONB,
+        allowNull: true,
+        defaultValue: null
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -49,8 +55,7 @@ module.exports = {
     });
 
     await queryInterface.addIndex('form_configs', ['config_code'], {
-      name: 'idx_form_configs_config_code',
-      unique: true
+      name: 'idx_form_configs_config_code'
     });
   },
 

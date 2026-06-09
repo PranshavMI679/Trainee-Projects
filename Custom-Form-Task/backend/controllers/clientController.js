@@ -1,6 +1,6 @@
 const { Client } = require('../models');
 const AppError = require('../utils/appError');
-const ErrorMessages = require('../utils/errorMessages');
+const { v4: uuidv4 } = require('uuid');
 
 exports.createClient = async (req, res, next) => {
   try {
@@ -8,10 +8,13 @@ exports.createClient = async (req, res, next) => {
 
     const existing = await Client.findOne({ where: { client_name } });
     if (existing) {
-      return next(new AppError("A corporate profile with this name already exists.", 400));
+      return next(new AppError("A employee profile with this name already exists.", 400));
     }
 
-    const record = await Client.create({ client_name });
+    const record = await Client.create({ 
+      client_name,
+      client_code: uuidv4()
+    });
 
     return res.status(201).json({
       success: true,
@@ -20,7 +23,7 @@ exports.createClient = async (req, res, next) => {
       client_name: record.client_name
     });
   } catch (error) {
-    next(new AppError(ErrorMessages.SERVER.CLIENT_SPECS_CREATE, 500));
+    return next(error);
   }
 };
 
@@ -29,6 +32,6 @@ exports.getAllClients = async (req, res, next) => {
     const records = await Client.findAll({ order: [['client_id', 'ASC']] });
     return res.status(200).json(records);
   } catch (error) {
-    next(new AppError(ErrorMessages.SERVER.INTERNAL, 500));
+    return next(error);
   }
 };

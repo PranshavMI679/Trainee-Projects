@@ -29,6 +29,10 @@ exports.createFormLayout = async (req, res, next) => {
       const singleFieldConfigCode = uuidv4();
       trackingCodes.push(singleFieldConfigCode);
 
+      const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      const allowsOptions = ['dropdown', 'radioselection'].includes(normalizedType);
+
       return {
         config_code: singleFieldConfigCode, 
         client_id: targetClient.client_id,
@@ -36,12 +40,14 @@ exports.createFormLayout = async (req, res, next) => {
         label: field.label.trim(),
         type: field.type.trim(),
         is_required: !!field.is_required,
-        length: field.length || null
+        length: field.length || null,
+        options: allowsOptions && Array.isArray(field.options) 
+          ? field.options.map(o => String(o).trim()) 
+          : null
       };
     });
 
     await FormConfig.bulkCreate(bulkInsertPayload, { transaction: t });
-
     await t.commit();
 
     return res.status(201).json({
@@ -75,7 +81,8 @@ exports.getClientLayout = async (req, res, next) => {
       label: layout.label,
       type: layout.type,
       is_required: layout.is_required,
-      length: layout.length
+      length: layout.length,
+      options: layout.options 
     }));
 
     return res.status(200).json({
@@ -95,7 +102,7 @@ exports.editConfiglayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const { config_code } = req.params;
-    const { key, label, type, is_required, length } = req.body;
+    const { key, label, type, is_required, length, options } = req.body;
 
     const existingLayout = await FormConfig.findOne({ where: { config_code } });
     if (!existingLayout) {
@@ -103,12 +110,19 @@ exports.editConfiglayout = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
+    const currentType = type ? type.trim() : existingLayout.type;
+    const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const allowsOptions = ['dropdown', 'radioselection'].includes(normalizedType);
+
     await FormConfig.update({
       key: key ? key.trim() : existingLayout.key,
       label: label ? label.trim() : existingLayout.label,
-      type: type ? type.trim() : existingLayout.type,
+      type: currentType,
       is_required: is_required !== undefined ? !!is_required : existingLayout.is_required,
-      length: length || existingLayout.length
+      length: length || existingLayout.length,
+      options: allowsOptions 
+        ? (Array.isArray(options) ? options.map(o => String(o).trim()) : existingLayout.options)
+        : null
     }, { where: { config_code }, transaction: t });
 
     await t.commit();
@@ -149,11 +163,10 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: `Form field configuration and related data cleared successfully.`
+      message: "Form field configuration and related data cleared successfully."
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
     return next(error);
   }
 };
-
