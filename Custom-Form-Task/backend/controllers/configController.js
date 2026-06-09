@@ -6,38 +6,39 @@ const { v4: uuidv4 } = require('uuid');
 exports.createFormLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { client_name, fields } = req.body;
+    const { fields } = req.body;
     const { client_code } = req.params;
 
-    let targetClient = null;
-
-    if (client_code && client_code !== 'new') {
-      targetClient = await Client.findOne({ where: { client_code } });
-      if (!targetClient) {
-        await t.rollback();
-        return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
-      }
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      await t.rollback();
+      return next(new AppError("Fields payload must be a non-empty array.", 400));
     }
 
+    const targetClient = await Client.findOne({ where: { client_code } });
     if (!targetClient) {
-      if (!client_name || client_name.trim() === '') {
-        await t.rollback();
-        return next(new AppError(ErrorMessages.CLIENT.NAME_REQUIRED, 400));
-      }
-      targetClient = await Client.create({ client_name }, { transaction: t });
+      await t.rollback();
+      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const generatedConfigCode = uuidv4();
+    const trackingCodes = [];
+    const bulkInsertPayload = fields.map(field => {
+      if (!field.key || !field.label || !field.type) {
+        throw new AppError("Each field structure must possess a valid key, label, and type.", 400);
+      }
+      
+      const singleFieldConfigCode = uuidv4();
+      trackingCodes.push(singleFieldConfigCode);
 
-    const bulkInsertPayload = fields.map(field => ({
-      config_code: generatedConfigCode,
-      client_id: targetClient.client_id,
-      key: field.key,
-      label: field.label,
-      type: field.type,
-      is_required: field.is_required,
-      length: field.length || null
-    }));
+      return {
+        config_code: singleFieldConfigCode, 
+        client_id: targetClient.client_id,
+        key: field.key.trim(),
+        label: field.label.trim(),
+        type: field.type.trim(),
+        is_required: !!field.is_required,
+        length: field.length || null
+      };
+    });
 
     await FormConfig.bulkCreate(bulkInsertPayload, { transaction: t });
 
@@ -45,48 +46,48 @@ exports.createFormLayout = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      message: "Form layout configuration template created successfully.",
-      config_code: generatedConfigCode,
+      message: "Form configuration fields registered successfully.",
       client_id: targetClient.client_id,
       client_code: targetClient.client_code,
-      client_name: targetClient.client_name,
-      fields_count: fields.length
+      fields_count: fields.length,
+      generated_config_codes: trackingCodes 
     });
   } catch (error) {
-    await t.rollback();
-    next(new AppError(ErrorMessages.SERVER.CLIENT_SPECS_CREATE, 500));
+    if (t && !t.finished) await t.rollback();
+    return next(error);
   }
 };
 
 exports.getClientLayout = async (req, res, next) => {
   try {
-    const { config_code } = req.params;
+    const { client_code } = req.params;
 
-    const layouts = await FormConfig.findAll({ where: { config_code } });
-
-    if (!layouts || layouts.length === 0) {
+    const targetClient = await Client.findOne({ where: { client_code } });
+    if (!targetClient) {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const targetClient = await Client.findOne({ where: { client_id: layouts[0].client_id } });
+    const layouts = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
 
-    const formattedFields = layouts.map(l => ({
-      key: l.key,
-      label: l.label,
-      type: l.type,
-      is_required: l.is_required,
-      length: l.length
+    const formattedFields = layouts.map(layout => ({
+      config_code: layout.config_code,
+      key: layout.key,
+      label: layout.label,
+      type: layout.type,
+      is_required: layout.is_required,
+      length: layout.length
     }));
 
     return res.status(200).json({
-      config_code,
-      client_id: targetClient ? targetClient.client_id : null,
-      client_code: targetClient ? targetClient.client_code : null,
-      client_name: targetClient ? targetClient.client_name : null,
+      success: true,
+      client_id: targetClient.client_id,
+      client_code: targetClient.client_code,
+      client_name: targetClient.client_name,
+      fields_count: formattedFields.length,
       fields: formattedFields
     });
   } catch (error) {
-    next(new AppError(ErrorMessages.SERVER.LAYOUT_FETCH, 500));
+    return next(error);
   }
 };
 
@@ -94,66 +95,52 @@ exports.editConfiglayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const { config_code } = req.params;
-    const { client_name, fields } = req.body;
+    const { key, label, type, is_required, length } = req.body;
 
-    const existingLayouts = await FormConfig.findAll({ where: { config_code } });
-    if (!existingLayouts || existingLayouts.length === 0) {
+    const existingLayout = await FormConfig.findOne({ where: { config_code } });
+    if (!existingLayout) {
       await t.rollback();
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const currentClientId = existingLayouts[0].client_id;
-
-    if (client_name) {
-      await Client.update({ client_name }, { where: { client_id: currentClientId }, transaction: t });
-    }
-
-    await FormConfig.destroy({ where: { config_code }, transaction: t });
-
-    const updatedPayload = fields.map(field => ({
-      config_code,
-      client_id: currentClientId,
-      key: field.key,
-      label: field.label,
-      type: field.type,
-      is_required: field.is_required,
-      length: field.length || null
-    }));
-
-    await FormConfig.bulkCreate(updatedPayload, { transaction: t });
+    await FormConfig.update({
+      key: key ? key.trim() : existingLayout.key,
+      label: label ? label.trim() : existingLayout.label,
+      type: type ? type.trim() : existingLayout.type,
+      is_required: is_required !== undefined ? !!is_required : existingLayout.is_required,
+      length: length || existingLayout.length
+    }, { where: { config_code }, transaction: t });
 
     await t.commit();
 
-    const targetClient = await Client.findOne({ where: { client_id: currentClientId } });
-
     return res.status(200).json({
       success: true,
-      message: "Form configuration layout template parameters updated successfully.",
-      config_code,
-      client_id: targetClient.client_id,
-      client_code: targetClient.client_code,
-      updated_fields_count: fields.length
+      message: "Form configuration parameter updated successfully.",
+      config_code
     });
   } catch (error) {
-    await t.rollback();
-    next(new AppError(ErrorMessages.SERVER.CLIENT_SPECS_CREATE, 500));
+    if (t && !t.finished) await t.rollback();
+    return next(error);
   }
 };
 
 exports.deleteFieldFromLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { config_code, key } = req.params;
+    const { config_code } = req.params;
 
-    const deletedCount = await FormConfig.destroy({ where: { config_code, key }, transaction: t });
-
-    if (deletedCount === 0) {
+    const existingLayout = await FormConfig.findOne({ where: { config_code } });
+    if (!existingLayout) {
       await t.rollback();
-      return next(new AppError("The specified field key configuration was not found.", 404));
+      return next(new AppError("The specified field configuration was not found.", 404));
     }
 
+    const fieldKey = existingLayout.key;
+
+    await FormConfig.destroy({ where: { config_code }, transaction: t });
+
     await Form.update(
-      { custom_values: sequelize.literal(`custom_values - '${key}'`) },
+      { custom_values: sequelize.literal(`custom_values - '${fieldKey}'`) },
       { where: { config_code }, transaction: t }
     );
 
@@ -161,10 +148,10 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: `Custom form field key '${key}' and all its corresponding historical data answers were cleared successfully.`
+      message: `Form field configuration and related data cleared successfully.`
     });
   } catch (error) {
-    await t.rollback();
-    next(error);
+    if (t && !t.finished) await t.rollback();
+    return next(error);
   }
 };

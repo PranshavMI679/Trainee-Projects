@@ -1,7 +1,52 @@
-const { Form, FormConfig } = require('../models');
+const { Form, FormConfig, Client } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
-const { v4: uuidv4 } = require('uuid');
+
+exports.getFormLayout = async (req, res, next) => {
+  try {
+    const { client_code } = req.params;
+
+    const targetClient = await Client.findOne({ where: { client_code } });
+    if (!targetClient) {
+      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+    }
+
+    const fields = await FormConfig.findAll({
+      where: { client_id: targetClient.client_id }
+    });
+
+    if (!fields || fields.length === 0) {
+      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+    }
+
+    const dynamicCustomFields = {};
+    fields.forEach(f => {
+      dynamicCustomFields[f.key] = {
+        config_code: f.config_code,
+        key: f.key,
+        label: f.label,
+        type: f.type,
+        is_required: f.is_required,
+        length: f.length,
+        value: null
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      client_name: targetClient.client_name,
+      form_template: {
+        employee_id: null,    
+        employee_code: null,   
+        name: "",               
+        email: "",              
+        custom_values: dynamicCustomFields 
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 exports.getAllDetails = async (req, res, next) => {
   try {
@@ -13,10 +58,11 @@ exports.getAllDetails = async (req, res, next) => {
 
     for (const item of entries) {
       const blueprints = await FormConfig.findAll({ 
-        where: { config_code: item.config_code } 
+        where: { client_id: item.client_id } 
       });
 
       const configMap = blueprints.map(b => ({
+        config_code: b.config_code,
         label: b.label,
         key: b.key,
         value: item.custom_values && item.custom_values[b.key] !== undefined ? item.custom_values[b.key] : null,
@@ -25,6 +71,7 @@ exports.getAllDetails = async (req, res, next) => {
 
       payload.push({
         id: item.employee_id,
+        employee_code: item.employee_code,
         name: item.name,
         email: item.email,
         config: configMap
@@ -33,40 +80,7 @@ exports.getAllDetails = async (req, res, next) => {
 
     return res.status(200).json(payload);
   } catch (error) {
-    next(new AppError(ErrorMessages.SERVER.EMPLOYEE_FETCH, 500));
-  }
-};
-
-exports.getFormLayout = async (req, res, next) => {
-  try {
-    const { client_code } = req.params;
-
-    const fields = await FormConfig.findAll({
-      where: { client_id: client_code }
-    });
-
-    if (!fields || fields.length === 0) {
-      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
-    }
-
-    const targetConfigCode = fields[0].config_code;
-    const targetClientName = fields[0].client_name;
-
-    const layoutBlueprint = fields.map(f => ({
-      key: f.key,
-      label: f.label,
-      type: f.type,
-      is_required: f.is_required,
-      length: f.length
-    }));
-
-    return res.status(200).json({
-      config_code: targetConfigCode,
-      client_name: targetClientName,
-      fields: layoutBlueprint
-    });
-  } catch (error) {
-    next(new AppError(ErrorMessages.SERVER.LAYOUT_FETCH, 500));
+    return next(error);
   }
 };
 
@@ -80,10 +94,11 @@ exports.getEmployeeDetails = async (req, res, next) => {
     }
 
     const blueprints = await FormConfig.findAll({ 
-      where: { config_code: emp.config_code } 
+      where: { client_id: emp.client_id } 
     });
 
     const configMap = blueprints.map(b => ({
+      config_code: b.config_code,
       label: b.label,
       key: b.key,
       value: emp.custom_values && emp.custom_values[b.key] !== undefined ? emp.custom_values[b.key] : null,
@@ -92,43 +107,53 @@ exports.getEmployeeDetails = async (req, res, next) => {
 
     return res.status(200).json({
       id: emp.employee_id,
+      employee_code: emp.employee_code,
       name: emp.name,
       email: emp.email,
       config: configMap
     });
   } catch (error) {
-    next(new AppError(ErrorMessages.SERVER.EMPLOYEE_FETCH, 500));
+    return next(error);
   }
 };
 
 exports.enterDetails = async (req, res, next) => {
   try {
-    const { config_code } = req.params; 
+    const { client_code } = req.params; 
     const { name, email, custom_values } = req.body;
 
+    const targetClient = await Client.findOne({ where: { client_code } });
+    if (!targetClient) {
+      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+    }
+
     const record = await Form.create({
-      config_code,
+      client_id: targetClient.client_id,
       name,
       email,
       custom_values: custom_values || {}
     });
 
-    const fields = await FormConfig.findAll({ where: { config_code } });
+    const fields = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
 
     const formattedConfig = fields.map(field => ({
+      config_code: field.config_code,
       label: field.label,
       key: field.key,
-      value: custom_values && custom_values[field.key] !== undefined ? custom_values[field.key] : null,
-      type: field.type
+      type: field.type,
+      value: custom_values && custom_values[field.key] !== undefined ? custom_values[field.key] : null
     }));
 
     return res.status(201).json({
+      success: true,
+      message: "Employee data captured successfully.",
       id: record.employee_id,
+      employee_code: record.employee_code,
       name: record.name,
       email: record.email,
       config: formattedConfig
     });
   } catch (error) {
-    next(new AppError(ErrorMessages.FORM.SUBMISSION_FAILED, 500));
+    return next(error);
   }
 };

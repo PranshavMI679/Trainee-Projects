@@ -13,8 +13,8 @@ const Form = sequelize.define('Form', {
     autoIncrement: true,
     unique: true
   },
-  config_code: {
-    type: DataTypes.UUID,
+  client_id: {
+    type: DataTypes.INTEGER,
     allowNull: false
   },
   name: {

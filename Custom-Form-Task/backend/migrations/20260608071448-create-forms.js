@@ -15,8 +15,8 @@ module.exports = {
         autoIncrement: true,
         unique: true
       },
-      config_code: {
-        type: Sequelize.UUID,
+      client_id: {
+        type: Sequelize.INTEGER,
         allowNull: false
       },
       name: {
@@ -45,14 +45,13 @@ module.exports = {
       }
     });
 
-    // AIRTIGHT SYNTAX: Explicitly using 'table' and 'field' as required by addConstraint
     await queryInterface.addConstraint('forms', {
-      fields: ['config_code'],
+      fields: ['client_id'],
       type: 'foreign key',
-      name: 'fk_forms_config_code',
+      name: 'fk_forms_client_id',
       references: {
-        table: 'form_configs',
-        field: 'config_code'
+        table: 'clients', 
+        field: 'client_id'
       },
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
