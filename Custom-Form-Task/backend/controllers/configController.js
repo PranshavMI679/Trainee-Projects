@@ -28,7 +28,17 @@ exports.createFormLayout = async (req, res, next) => {
       }
 
       const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const allowsOptions = ['dropdown', 'radio', 'radioselection'].includes(normalizedType);
+      
+      const allowsOptions = ['dropdown', 'radio', 'radioselection', 'currency'].includes(normalizedType);
+
+      let processedOptions = null;
+      if (allowsOptions && field.options) {
+        if (Array.isArray(field.options)) {
+          processedOptions = field.options.map(o => String(o).trim());
+        } else if (typeof field.options === 'object') {
+          processedOptions = field.options;
+        }
+      }
 
       return {
         config_code: unifiedFormConfigCode,
@@ -38,9 +48,7 @@ exports.createFormLayout = async (req, res, next) => {
         type: field.type.trim(),
         is_required: !!field.is_required,
         length: field.length || null,
-        options: allowsOptions && Array.isArray(field.options) 
-          ? field.options.map(o => String(o).trim()) 
-          : null
+        options: processedOptions
       };
     });
 
@@ -118,16 +126,25 @@ exports.editConfiglayout = async (req, res, next) => {
 
     const currentType = type ? type.trim() : existingLayout.type;
     const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const allowsOptions = ['dropdown', 'radio', 'radioselection'].includes(normalizedType);
+    const allowsOptions = ['dropdown', 'radio', 'radioselection', 'currency'].includes(normalizedType);
+
+    let processedOptions = existingLayout.options;
+    if (allowsOptions && options) {
+      if (Array.isArray(options)) {
+        processedOptions = options.map(o => String(o).trim());
+      } else if (typeof options === 'object') {
+        processedOptions = options;
+      }
+    } else if (!allowsOptions) {
+      processedOptions = null;
+    }
 
     await FormConfig.update({
       label: label ? label.trim() : existingLayout.label,
       type: currentType,
       is_required: is_required !== undefined ? !!is_required : existingLayout.is_required,
       length: length || existingLayout.length,
-      options: allowsOptions 
-        ? (Array.isArray(options) ? options.map(o => String(o).trim()) : existingLayout.options)
-        : null
+      options: processedOptions
     }, { 
       where: { config_code, key: key.trim() }, 
       transaction: t 

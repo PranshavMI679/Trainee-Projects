@@ -7,8 +7,6 @@ const REGEX_PATTERNS = {
   PHONE: /^\+?[1-9]\d{1,14}$/
 };
 
-const APPROVED_CURRENCIES = ['USD', 'INR', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'AED'];
-
 const configValidation = async (req, res, next) => {
   try {
     let { config_code } = req.params; 
@@ -26,7 +24,7 @@ const configValidation = async (req, res, next) => {
       });
       
       if (layoutTemplate) {
-        config_code = layoutTemplate.config_code;
+        config_code = layoutTemplate.config_code; 
       }
     }
 
@@ -88,7 +86,7 @@ const configValidation = async (req, res, next) => {
 
         case 'date':
           joiFieldSchema = Joi.date().iso().messages({
-            'date.format': `Custom field '${rule.label}' requires a standard calendar date timeline format (YYYY-MM-DD).`
+            'date.format': `Custom field '${rule.label}' requires a standard calendar date format (YYYY-MM-DD).`
           });
           break;
 
@@ -107,23 +105,9 @@ const configValidation = async (req, res, next) => {
 
         case 'decimal':
         case 'percent':
-          joiFieldSchema = Joi.number().messages({
-            'number.base': `Custom field '${rule.label}' requires a valid numerical floating point integer representation.`
-          });
-          break;
-
         case 'currency':
-          joiFieldSchema = Joi.object({
-            value: Joi.number().required().messages({
-              'any.required': `Numeric transaction amount value is required inside currency selector '${rule.label}'.`,
-              'number.base': `Amount within currency field '${rule.label}' must be a number.`
-            }),
-            denomination: Joi.string().trim().uppercase().valid(...APPROVED_CURRENCIES).required().messages({
-              'any.required': `Denomination unit choice is required inside currency selector '${rule.label}'.`,
-              'any.only': `Requested currency unit inside '${rule.label}' is invalid. Approved options list: [${APPROVED_CURRENCIES.join(', ')}].`
-            })
-          }).messages({
-            'object.base': `Custom field '${rule.label}' requires a compound data structure containing both 'value' and 'denomination' object keys.`
+          joiFieldSchema = Joi.number().messages({
+            'number.base': `Custom field '${rule.label}' requires a valid numerical representation.`
           });
           break;
 
@@ -134,8 +118,10 @@ const configValidation = async (req, res, next) => {
           break;
 
         case 'url':
+        case 'fileupload':
+        case 'file':
           joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.URL).messages({
-            'string.pattern.base': `Custom field '${rule.label}' must map to a valid web URL route endpoint address.`
+            'string.pattern.base': `Custom field '${rule.label}' must map to a valid web URL link destination address.`
           });
           break;
 

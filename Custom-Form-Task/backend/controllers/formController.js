@@ -29,9 +29,7 @@ exports.getFormLayout = async (req, res, next) => {
         is_required: f.is_required,
         length: f.length,
         options: f.options, 
-        value: f.type.toLowerCase().replace(/[^a-z0-9]/g, '') === 'currency' 
-          ? { value: null, denomination: null } 
-          : null
+        value: null
       };
     });
 

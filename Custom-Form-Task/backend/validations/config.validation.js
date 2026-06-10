@@ -13,7 +13,6 @@ const VALID_TYPES = [
   'number', 'Number',
   'decimal', 'Decimal',
   'percent', 'Percent',
-  'currency', 'Currency',
   'phone', 'Phone',
   'url', 'URL'
 ];
@@ -50,7 +49,7 @@ const singleFieldSchema = Joi.object({
     .messages({
       'string.empty': ErrorMessages.VALIDATION.FIELD_TYPE_REQUIRED,
       'any.required': ErrorMessages.VALIDATION.FIELD_TYPE_REQUIRED,
-      'any.only': 'Requested field type must match one of the 14 approved UI datatypes.'
+      'any.only': 'Requested field type must match one of the approved UI datatypes.'
     }),
 
   is_required: Joi.boolean()
@@ -77,9 +76,9 @@ const singleFieldSchema = Joi.object({
     .allow(null)
     .optional()
     .when('type', {
-      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection', 'radio', 'Radio'),
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radio', 'Radio'),
       then: Joi.array().min(1).required().messages({
-        'any.required': 'Selection lists (Dropdown/Radio) require at least one configured option entry.'
+        'any.required': 'Selection lists Dropdown or Radio require at least one configured option entry.'
       }),
       otherwise: Joi.array().optional()
     })
@@ -134,7 +133,7 @@ const editFieldSchema = Joi.object({
     .valid(...VALID_TYPES)
     .optional()
     .messages({
-      'any.only': 'Requested field type must match one of the 14 approved UI datatypes.'
+      'any.only': 'Requested field type must match one of the approved UI datatypes.'
     }),
 
   is_required: Joi.boolean()
