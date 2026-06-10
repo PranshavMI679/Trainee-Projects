@@ -143,6 +143,18 @@ exports.enterDetails = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
+    const fieldsConfig = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
+    
+    for (const field of fieldsConfig) {
+      if (field.is_required) {
+        const userProvidedValue = custom_values ? custom_values[field.key] : undefined;
+        
+        if (userProvidedValue === undefined || userProvidedValue === null || String(userProvidedValue).trim() === "") {
+          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+        }
+      }
+    }
+
     const record = await Form.create({
       client_id: targetClient.client_id,
       name,
@@ -150,9 +162,7 @@ exports.enterDetails = async (req, res, next) => {
       custom_values: custom_values || {}
     });
 
-    const fields = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
-
-    const formattedConfig = fields.map(field => ({
+    const formattedConfig = fieldsConfig.map(field => ({
       config_code: field.config_code,
       label: field.label,
       key: field.key,
@@ -164,6 +174,71 @@ exports.enterDetails = async (req, res, next) => {
     return res.status(201).json({
       success: true,
       message: "Employee data captured successfully.",
+      id: record.employee_id,
+      employee_code: record.employee_code,
+      name: record.name,
+      email: record.email,
+      config: formattedConfig
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.editFormDetails = async (req, res, next) => {
+  try {
+    const { employee_code } = req.params; 
+    const { name, email, custom_values } = req.body;
+
+    const record = await Form.findOne({ where: { employee_code } });
+    if (!record) {
+      return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
+    }
+
+    const baseCustomValues = record.custom_values || {};
+    const overwrittenCustomValues = {
+      ...baseCustomValues,
+      ...(custom_values || {})
+    };
+
+    Object.keys(overwrittenCustomValues).forEach(key => {
+      if (overwrittenCustomValues[key] === null || overwrittenCustomValues[key] === undefined) {
+        delete overwrittenCustomValues[key];
+      }
+    });
+
+    const fieldsConfig = await FormConfig.findAll({ where: { client_id: record.client_id } });
+
+    for (const field of fieldsConfig) {
+      if (field.is_required) {
+        const mergedValue = overwrittenCustomValues[field.key];
+        
+        if (mergedValue === undefined || mergedValue === null || String(mergedValue).trim() === "") {
+          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+        }
+      }
+    }
+
+    await record.update({
+      name: name !== undefined ? name : record.name,
+      email: email !== undefined ? email : record.email,
+      custom_values: overwrittenCustomValues
+    });
+
+    const formattedConfig = fieldsConfig.map(field => ({
+      config_code: field.config_code,
+      label: field.label,
+      key: field.key,
+      type: field.type,
+      options: field.options,
+      value: record.custom_values && record.custom_values[field.key] !== undefined 
+        ? record.custom_values[field.key] 
+        : null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Employee data updated successfully.",
       id: record.employee_id,
       employee_code: record.employee_code,
       name: record.name,

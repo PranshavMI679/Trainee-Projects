@@ -77,7 +77,7 @@ const singleFieldSchema = Joi.object({
     .allow(null)
     .optional()
     .when('type', {
-      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection'),
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection', 'radio', 'Radio'),
       then: Joi.array().min(1).required().messages({
         'any.required': 'Selection lists (Dropdown/Radio) require at least one configured option entry.'
       }),
@@ -159,7 +159,7 @@ const editFieldSchema = Joi.object({
     .allow(null)
     .optional()
     .when('type', {
-      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection'),
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection', 'radio', 'Radio'),
       then: Joi.array().min(1).required(),
       otherwise: Joi.array().optional()
     })

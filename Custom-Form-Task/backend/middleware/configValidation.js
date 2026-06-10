@@ -1,20 +1,41 @@
 const Joi = require('joi');
-const { FormConfig } = require('../models');
+const { FormConfig, Form } = require('../models');
 const AppError = require('../utils/appError');
 
 const REGEX_PATTERNS = {
-  URL: /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/
+  URL: /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/,
+  PHONE: /^\+?[1-9]\d{1,14}$/
 };
 
 const APPROVED_CURRENCIES = ['USD', 'INR', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'AED'];
 
 const configValidation = async (req, res, next) => {
   try {
-    const { config_code } = req.params; 
+    let { config_code } = req.params; 
+    const { employee_code } = req.params;
     const { custom_values } = req.body;
 
+    if (!config_code && employee_code) {
+      const employeeRecord = await Form.findOne({ where: { employee_code } });
+      if (!employeeRecord) {
+        return next(new AppError("The targeted employee submission record does not exist.", 404));
+      }
+
+      const layoutTemplate = await FormConfig.findOne({ 
+        where: { client_id: employeeRecord.client_id } 
+      });
+      
+      if (layoutTemplate) {
+        config_code = layoutTemplate.config_code;
+      }
+    }
+
+    if (!config_code && req.body.config_code) {
+      config_code = req.body.config_code;
+    }
+
     if (!config_code) {
-      return next(new AppError("Configuration template code is required in the URL parameters.", 400));
+      return next(new AppError("Configuration template code is required to enforce field rules.", 400));
     }
 
     const rules = await FormConfig.findAll({ where: { config_code } });
@@ -49,6 +70,7 @@ const configValidation = async (req, res, next) => {
           break;
 
         case 'dropdown':
+        case 'radio':
         case 'radioselection':
           if (!rule.options || !Array.isArray(rule.options)) {
             return next(new AppError(`Configuration exception: Options are missing for choice list field '${rule.label}'.`, 500));
