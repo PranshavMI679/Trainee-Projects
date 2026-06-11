@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { FormConfig, Form } = require('../models');
+const { FormConfig, Form, Client } = require('../models');
 const AppError = require('../utils/appError');
 
 const REGEX_PATTERNS = {
@@ -9,9 +9,24 @@ const REGEX_PATTERNS = {
 
 const configValidation = async (req, res, next) => {
   try {
-    let { config_code } = req.params; 
+    let { config_code, client_code } = req.params; 
     const { employee_code } = req.params;
     const { custom_values } = req.body;
+
+    if (!config_code && client_code) {
+      const targetClient = await Client.findOne({ where: { client_code } });
+      if (!targetClient) {
+        return next(new AppError("Client configuration not found.", 404));
+      }
+
+      const layoutTemplate = await FormConfig.findOne({ 
+        where: { client_id: targetClient.client_id } 
+      });
+      
+      if (layoutTemplate) {
+        config_code = layoutTemplate.config_code; 
+      }
+    }
 
     if (!config_code && employee_code) {
       const employeeRecord = await Form.findOne({ where: { employee_code } });
@@ -53,6 +68,8 @@ const configValidation = async (req, res, next) => {
         case 'singleline':
         case 'textbox': 
         case 'multiline':
+        case 'currency': 
+        case 'phone':    
           joiFieldSchema = Joi.string().trim();
           if (rule.length) {
             joiFieldSchema = joiFieldSchema.max(rule.length).messages({
@@ -63,32 +80,31 @@ const configValidation = async (req, res, next) => {
 
         case 'email':
           joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EMAIL_BASIC).messages({
-            'string.pattern.base': `Custom field '${rule.label}' must be a valid structure containing an '@' and a '.' symbol.`
+            'string.pattern.base': `Custom field '${rule.label}' must be a valid email structure containing an '@' and a '.' symbol.`
           });
           break;
 
         case 'dropdown':
         case 'radio':
         case 'radioselection':
-          if (!rule.options || !Array.isArray(rule.options)) {
-            return next(new AppError(`Configuration exception: Options are missing for choice list field '${rule.label}'.`, 500));
-          }
-          joiFieldSchema = Joi.alternatives().try(
-            Joi.any().valid(...rule.options),
-            Joi.array().items(Joi.any().valid(...rule.options)).min(1)
-          ).messages({
-            'any.only': `The selected value for '${rule.label}' is invalid. Allowed options: [${rule.options.join(', ')}].`,
-            'array.base': `The selection choice for '${rule.label}' must be a string value or an array of strings.`
-          });
-          break;
-
         case 'checkbox':
-          joiFieldSchema = Joi.alternatives().try(
-            Joi.boolean(),
-            Joi.array().items(Joi.string().trim())
-          ).messages({
-            'boolean.base': `Custom field '${rule.label}' must be a valid true/false flag or an option collection list.`
-          });
+          if (!rule.options || !Array.isArray(rule.options.value)) {
+            return next(new AppError(`Configuration exception: Options values collection list is missing for field '${rule.label}'.`, 500));
+          }
+          
+          const allowedList = rule.options.value;
+
+          if (rule.options.is_multiple === true || rule.options.is_multiple === 'true') {
+            joiFieldSchema = Joi.array().items(Joi.string().trim().valid(...allowedList)).min(1).messages({
+              'any.only': `One or more selected values for '${rule.label}' are invalid. Allowed: [${allowedList.join(', ')}].`,
+              'array.base': `Custom field '${rule.label}' must be an array list of string options.`
+            });
+          } else {
+            joiFieldSchema = Joi.string().trim().valid(...allowedList).messages({
+              'any.only': `The selected choice for '${rule.label}' is invalid. Allowed options: [${allowedList.join(', ')}].`,
+              'string.base': `Custom field '${rule.label}' must be a single text option value.`
+            });
+          }
           break;
 
         case 'date':
@@ -137,41 +153,6 @@ const configValidation = async (req, res, next) => {
           }
           break;
 
-        case 'currency':
-          joiFieldSchema = Joi.object({
-            symbol: Joi.string().trim().required().messages({
-              'any.required': `Currency symbol is required for '${rule.label}'.`,
-              'string.empty': `Currency symbol for '${rule.label}' cannot be left blank.`
-            }),
-            amount: Joi.number().min(0).required().messages({
-              'any.required': `Monetary price amount is required for '${rule.label}'.`,
-              'number.base': `Currency amount for '${rule.label}' must be numeric.`,
-              'number.min': `Currency amount for '${rule.label}' cannot be negative.`
-            })
-          });
-          if (rule.length) {
-            joiFieldSchema = joiFieldSchema.append({
-              amount: Joi.number().min(0).precision(rule.length).required().messages({
-                'number.precision': `Currency amount for '${rule.label}' cannot exceed ${rule.length} decimal places.`
-              })
-            });
-          }
-          break;
-
-        case 'phone':
-          joiFieldSchema = Joi.object({
-            country_code: Joi.string().trim().required().messages({
-              'any.required': `Country dialing prefix code is required for '${rule.label}'.`,
-              'string.empty': `Country code for '${rule.label}' cannot be left empty.`
-            }),
-            phone_number: Joi.number().integer().positive().required().messages({
-              'any.required': `Subscriber phone line number is required for '${rule.label}'.`,
-              'number.base': `Phone number value for '${rule.label}' must be exclusively comprised of whole digits.`,
-              'number.positive': `Phone number value for '${rule.label}' cannot contain negative signs.`
-            })
-          });
-          break;
-
         case 'url':
           joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.URL).messages({
             'string.pattern.base': `Custom field '${rule.label}' must map to a valid web URL link destination address.`
@@ -192,8 +173,7 @@ const configValidation = async (req, res, next) => {
         if (rule.is_required) {
           joiFieldSchema = joiFieldSchema.required().messages({
             'any.required': `The dynamic field '${rule.label}' is marked mandatory.`,
-            'string.empty': `The dynamic field '${rule.label}' cannot be left empty.`,
-            'object.base': `The dynamic field '${rule.label}' must be fully populated with its component object fields.`
+            'string.empty': `The dynamic field '${rule.label}' cannot be left empty.`
           });
         } else {
           joiFieldSchema = joiFieldSchema.optional().allow('', null);

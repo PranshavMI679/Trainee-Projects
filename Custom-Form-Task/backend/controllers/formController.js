@@ -148,14 +148,12 @@ exports.enterDetails = async (req, res, next) => {
       if (field.is_required) {
         const value = custom_values ? custom_values[field.key] : undefined;
         
-        if (value === undefined || value === null || String(value).trim() === "" || (Array.isArray(value) && value.length === 0)) {
+        if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
           return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
         }
 
-        if (typeof value === 'object' && !Array.isArray(value)) {
-          if (Object.keys(value).length === 0) {
-            return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
-          }
+        if (typeof value === 'string' && value.trim() === "") {
+          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
         }
       }
     }
@@ -210,8 +208,6 @@ exports.editFormDetails = async (req, res, next) => {
 
         if (currentInput === null || currentInput === undefined) {
           delete existingValues[key];
-        } else if (typeof currentInput === 'object' && !Array.isArray(currentInput) && existingValues[key]) {
-          existingValues[key] = Object.assign({}, existingValues[key], currentInput);
         } else {
           existingValues[key] = currentInput;
         }
@@ -225,14 +221,12 @@ exports.editFormDetails = async (req, res, next) => {
       if (field.is_required) {
         const value = existingValues[field.key];
         
-        if (value === undefined || value === null || String(value).trim() === "" || (Array.isArray(value) && value.length === 0)) {
+        if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
           return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
         }
 
-        if (typeof value === 'object' && !Array.isArray(value)) {
-          if (Object.keys(value).length === 0) {
-            return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
-          }
+        if (typeof value === 'string' && value.trim() === "") {
+          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
         }
       }
     }

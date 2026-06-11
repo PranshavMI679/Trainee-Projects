@@ -22,6 +22,21 @@ const VALID_TYPES = [
   'file', 'File'
 ];
 
+// Universal sub-schema validation block for options object parameters
+const optionsSchema = Joi.object({
+  is_multiple: Joi.boolean().required().messages({
+    'any.required': 'The is_multiple selection parameter flag is required.'
+  }),
+  // Required only for choice list fields
+  value: Joi.array().items(Joi.string().trim().required()).min(1).optional().messages({
+    'array.min': 'The options value configuration list requires at least one option item entry.'
+  }),
+  // Allowed for numeric display configurations
+  thousand_separator: Joi.string().trim().allow(',', '.', ' ', '').optional(),
+  decimal_separator: Joi.string().trim().allow(',', '.', '').optional(),
+  decimal_separtor: Joi.string().trim().allow(',', '.', '').optional() // Typo safety fallback matching input payload variations
+});
+
 const singleFieldSchema = Joi.object({
   key: Joi.string()
     .trim()
@@ -76,19 +91,18 @@ const singleFieldSchema = Joi.object({
       'number.integer': ErrorMessages.VALIDATION.FIELD_LENGTH_INTEGER
     }),
 
-  options: Joi.array()
-    .items(Joi.string().trim().required())
+  options: optionsSchema
     .allow(null)
     .optional()
     .when('type', {
-      is: Joi.string().valid('dropdown', 'Dropdown', 'radio', 'Radio', 'radioselection', 'Radio Selection'),
-      then: Joi.array().min(1).required().messages({
-        'any.required': 'Selection lists Dropdown or Radio require at least one configured option entry.'
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radio', 'Radio', 'radioselection', 'Radio Selection', 'checkbox', 'Checkbox'),
+      then: Joi.object({
+        is_multiple: Joi.boolean().required(),
+        value: Joi.array().items(Joi.string().trim().required()).min(1).required()
+      }).required().messages({
+        'any.required': 'Choice selectors Dropdown, Radio, and Checkbox require a populated options configurations object block containing a value list.'
       }),
-      otherwise: Joi.array().optional()
-    })
-    .messages({
-      'array.base': 'Options must be a valid array list of strings.'
+      otherwise: Joi.object().optional()
     })
 });
 
@@ -158,14 +172,16 @@ const editFieldSchema = Joi.object({
       'number.integer': ErrorMessages.VALIDATION.FIELD_LENGTH_INTEGER
     }),
 
-  options: Joi.array()
-    .items(Joi.string().trim().required())
+  options: optionsSchema
     .allow(null)
     .optional()
     .when('type', {
-      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection', 'radio', 'Radio'),
-      then: Joi.array().min(1).required(),
-      otherwise: Joi.array().optional()
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radioselection', 'Radio Selection', 'radio', 'Radio', 'checkbox', 'Checkbox'),
+      then: Joi.object({
+        is_multiple: Joi.boolean().required(),
+        value: Joi.array().items(Joi.string().trim().required()).min(1).required()
+      }).required(),
+      otherwise: Joi.object().optional()
     })
 }).min(1);
 
