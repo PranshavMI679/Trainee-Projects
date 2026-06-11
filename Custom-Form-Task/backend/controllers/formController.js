@@ -143,12 +143,19 @@ exports.enterDetails = async (req, res, next) => {
 
     const fieldsConfig = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
     
-    for (const field of fieldsConfig) {
+    for (let i = 0; i < fieldsConfig.length; i++) {
+      const field = fieldsConfig[i];
       if (field.is_required) {
-        const userProvidedValue = custom_values ? custom_values[field.key] : undefined;
+        const value = custom_values ? custom_values[field.key] : undefined;
         
-        if (userProvidedValue === undefined || userProvidedValue === null || String(userProvidedValue).trim() === "") {
+        if (value === undefined || value === null || String(value).trim() === "" || (Array.isArray(value) && value.length === 0)) {
           return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+        }
+
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          if (Object.keys(value).length === 0) {
+            return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+          }
         }
       }
     }
@@ -193,26 +200,39 @@ exports.editFormDetails = async (req, res, next) => {
       return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
     }
 
-    const baseCustomValues = record.custom_values || {};
-    const overwrittenCustomValues = {
-      ...baseCustomValues,
-      ...(custom_values || {})
-    };
+    let existingValues = record.custom_values || {};
+    
+    if (custom_values && typeof custom_values === 'object') {
+      const inputKeys = Object.keys(custom_values);
+      for (let i = 0; i < inputKeys.length; i++) {
+        const key = inputKeys[i];
+        const currentInput = custom_values[key];
 
-    Object.keys(overwrittenCustomValues).forEach(key => {
-      if (overwrittenCustomValues[key] === null || overwrittenCustomValues[key] === undefined) {
-        delete overwrittenCustomValues[key];
+        if (currentInput === null || currentInput === undefined) {
+          delete existingValues[key];
+        } else if (typeof currentInput === 'object' && !Array.isArray(currentInput) && existingValues[key]) {
+          existingValues[key] = Object.assign({}, existingValues[key], currentInput);
+        } else {
+          existingValues[key] = currentInput;
+        }
       }
-    });
+    }
 
     const fieldsConfig = await FormConfig.findAll({ where: { client_id: record.client_id } });
 
-    for (const field of fieldsConfig) {
+    for (let i = 0; i < fieldsConfig.length; i++) {
+      const field = fieldsConfig[i];
       if (field.is_required) {
-        const mergedValue = overwrittenCustomValues[field.key];
+        const value = existingValues[field.key];
         
-        if (mergedValue === undefined || mergedValue === null || String(mergedValue).trim() === "") {
+        if (value === undefined || value === null || String(value).trim() === "" || (Array.isArray(value) && value.length === 0)) {
           return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+        }
+
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          if (Object.keys(value).length === 0) {
+            return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+          }
         }
       }
     }
@@ -220,7 +240,7 @@ exports.editFormDetails = async (req, res, next) => {
     await record.update({
       name: name !== undefined ? name : record.name,
       email: email !== undefined ? email : record.email,
-      custom_values: overwrittenCustomValues
+      custom_values: existingValues
     });
 
     const formattedConfig = fieldsConfig.map(field => ({

@@ -3,18 +3,23 @@ const ErrorMessages = require('../utils/errorMessages');
 
 const VALID_TYPES = [
   'singleline', 'Single Line',
+  'textbox', 'Textbox',
   'multiline', 'Multi-Line',
   'email', 'Email',
   'dropdown', 'Dropdown',
   'checkbox', 'Checkbox',
   'radio', 'Radio',
+  'radioselection', 'Radio Selection',
   'date', 'Date',
   'datetime', 'Date/Time',
   'number', 'Number',
   'decimal', 'Decimal',
   'percent', 'Percent',
+  'currency', 'Currency',
   'phone', 'Phone',
-  'url', 'URL'
+  'url', 'URL',
+  'fileupload', 'File Upload',
+  'file', 'File'
 ];
 
 const singleFieldSchema = Joi.object({
@@ -76,7 +81,7 @@ const singleFieldSchema = Joi.object({
     .allow(null)
     .optional()
     .when('type', {
-      is: Joi.string().valid('dropdown', 'Dropdown', 'radio', 'Radio'),
+      is: Joi.string().valid('dropdown', 'Dropdown', 'radio', 'Radio', 'radioselection', 'Radio Selection'),
       then: Joi.array().min(1).required().messages({
         'any.required': 'Selection lists Dropdown or Radio require at least one configured option entry.'
       }),

@@ -4,7 +4,7 @@ const AppError = require('../utils/appError');
 
 const REGEX_PATTERNS = {
   URL: /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/,
-  PHONE: /^\+?[1-9]\d{1,14}$/
+  EMAIL_BASIC: /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 };
 
 const configValidation = async (req, res, next) => {
@@ -62,8 +62,8 @@ const configValidation = async (req, res, next) => {
           break;
 
         case 'email':
-          joiFieldSchema = Joi.string().trim().email().messages({
-            'string.email': `Custom field '${rule.label}' must be a valid email address.`
+          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EMAIL_BASIC).messages({
+            'string.pattern.base': `Custom field '${rule.label}' must be a valid structure containing an '@' and a '.' symbol.`
           });
           break;
 
@@ -73,56 +73,114 @@ const configValidation = async (req, res, next) => {
           if (!rule.options || !Array.isArray(rule.options)) {
             return next(new AppError(`Configuration exception: Options are missing for choice list field '${rule.label}'.`, 500));
           }
-          joiFieldSchema = Joi.any().valid(...rule.options).messages({
-            'any.only': `The selected value for '${rule.label}' is invalid. Allowed options: [${rule.options.join(', ')}].`
+          joiFieldSchema = Joi.alternatives().try(
+            Joi.any().valid(...rule.options),
+            Joi.array().items(Joi.any().valid(...rule.options)).min(1)
+          ).messages({
+            'any.only': `The selected value for '${rule.label}' is invalid. Allowed options: [${rule.options.join(', ')}].`,
+            'array.base': `The selection choice for '${rule.label}' must be a string value or an array of strings.`
           });
           break;
 
         case 'checkbox':
-          joiFieldSchema = Joi.boolean().messages({
-            'boolean.base': `Custom field '${rule.label}' must be a boolean (true/false) checkbox flag value.`
+          joiFieldSchema = Joi.alternatives().try(
+            Joi.boolean(),
+            Joi.array().items(Joi.string().trim())
+          ).messages({
+            'boolean.base': `Custom field '${rule.label}' must be a valid true/false flag or an option collection list.`
           });
           break;
 
         case 'date':
-          joiFieldSchema = Joi.date().iso().messages({
-            'date.format': `Custom field '${rule.label}' requires a standard calendar date format (YYYY-MM-DD).`
-          });
-          break;
-
         case 'datetime':
-          joiFieldSchema = Joi.date().iso().messages({
-            'date.base': `Custom field '${rule.label}' requires an exact ISO date-time tracker location timestamp.`
+          joiFieldSchema = Joi.date().messages({
+            'date.base': `Custom field '${rule.label}' requires a valid date representation.`
           });
           break;
 
         case 'number':
-          joiFieldSchema = Joi.number().integer().messages({
+          joiFieldSchema = Joi.number().integer().min(0).messages({
             'number.base': `Custom field '${rule.label}' must be a valid numerical value.`,
-            'number.integer': `Custom field '${rule.label}' cannot possess floating decimal numbers.`
+            'number.integer': `Custom field '${rule.label}' cannot possess floating decimal numbers.`,
+            'number.min': `Custom field '${rule.label}' cannot contain negative signs.`
           });
+          if (rule.length) {
+            const maxVal = Math.pow(10, rule.length) - 1;
+            joiFieldSchema = joiFieldSchema.max(maxVal).messages({
+              'number.max': `Custom field '${rule.label}' exceeds the maximum allowed length of ${rule.length} digits.`
+            });
+          }
           break;
 
         case 'decimal':
-        case 'percent':
-        case 'currency':
-          joiFieldSchema = Joi.number().messages({
-            'number.base': `Custom field '${rule.label}' requires a valid numerical representation.`
+          joiFieldSchema = Joi.number().min(0).messages({
+            'number.base': `Custom field '${rule.label}' requires a valid decimal representation.`,
+            'number.min': `Custom field '${rule.label}' cannot contain negative signs.`
           });
+          if (rule.length) {
+            joiFieldSchema = joiFieldSchema.precision(rule.length).messages({
+              'number.precision': `Custom field '${rule.label}' cannot exceed ${rule.length} decimal places.`
+            });
+          }
+          break;
+
+        case 'percent':
+          joiFieldSchema = Joi.number().min(0).max(100).messages({
+            'number.base': `Custom field '${rule.label}' must be a valid percentage value.`,
+            'number.min': `Percentage value for '${rule.label}' must be between 0 and 100.`,
+            'number.max': `Percentage value for '${rule.label}' must be between 0 and 100.`
+          });
+          if (rule.length) {
+            joiFieldSchema = joiFieldSchema.precision(rule.length).messages({
+              'number.precision': `Percentage field '${rule.label}' cannot exceed ${rule.length} decimal places.`
+            });
+          }
+          break;
+
+        case 'currency':
+          joiFieldSchema = Joi.object({
+            symbol: Joi.string().trim().required().messages({
+              'any.required': `Currency symbol is required for '${rule.label}'.`,
+              'string.empty': `Currency symbol for '${rule.label}' cannot be left blank.`
+            }),
+            amount: Joi.number().min(0).required().messages({
+              'any.required': `Monetary price amount is required for '${rule.label}'.`,
+              'number.base': `Currency amount for '${rule.label}' must be numeric.`,
+              'number.min': `Currency amount for '${rule.label}' cannot be negative.`
+            })
+          });
+          if (rule.length) {
+            joiFieldSchema = joiFieldSchema.append({
+              amount: Joi.number().min(0).precision(rule.length).required().messages({
+                'number.precision': `Currency amount for '${rule.label}' cannot exceed ${rule.length} decimal places.`
+              })
+            });
+          }
           break;
 
         case 'phone':
-          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.PHONE).messages({
-            'string.pattern.base': `Custom field '${rule.label}' must match an operational international telecommunication phone number structure.`
+          joiFieldSchema = Joi.object({
+            country_code: Joi.string().trim().required().messages({
+              'any.required': `Country dialing prefix code is required for '${rule.label}'.`,
+              'string.empty': `Country code for '${rule.label}' cannot be left empty.`
+            }),
+            phone_number: Joi.number().integer().positive().required().messages({
+              'any.required': `Subscriber phone line number is required for '${rule.label}'.`,
+              'number.base': `Phone number value for '${rule.label}' must be exclusively comprised of whole digits.`,
+              'number.positive': `Phone number value for '${rule.label}' cannot contain negative signs.`
+            })
           });
           break;
 
         case 'url':
-        case 'fileupload':
-        case 'file':
           joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.URL).messages({
             'string.pattern.base': `Custom field '${rule.label}' must map to a valid web URL link destination address.`
           });
+          break;
+
+        case 'fileupload':
+        case 'file':
+          joiFieldSchema = Joi.any().optional();
           break;
 
         default:
@@ -130,13 +188,16 @@ const configValidation = async (req, res, next) => {
           break;
       }
 
-      if (rule.is_required) {
-        joiFieldSchema = joiFieldSchema.required().messages({
-          'any.required': `The dynamic field '${rule.label}' is marked mandatory.`,
-          'string.empty': `The dynamic field '${rule.label}' cannot be left empty.`
-        });
-      } else {
-        joiFieldSchema = joiFieldSchema.optional().allow('', null);
+      if (normalizedType !== 'fileupload' && normalizedType !== 'file') {
+        if (rule.is_required) {
+          joiFieldSchema = joiFieldSchema.required().messages({
+            'any.required': `The dynamic field '${rule.label}' is marked mandatory.`,
+            'string.empty': `The dynamic field '${rule.label}' cannot be left empty.`,
+            'object.base': `The dynamic field '${rule.label}' must be fully populated with its component object fields.`
+          });
+        } else {
+          joiFieldSchema = joiFieldSchema.optional().allow('', null);
+        }
       }
 
       dynamicJoiRules[rule.key] = joiFieldSchema;

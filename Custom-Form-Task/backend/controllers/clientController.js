@@ -8,7 +8,7 @@ exports.createClient = async (req, res, next) => {
 
     const existing = await Client.findOne({ where: { client_name } });
     if (existing) {
-      return next(new AppError("A employee profile with this name already exists.", 400));
+      return next(new AppError("A client with this name already exists.", 400));
     }
 
     const record = await Client.create({ 

@@ -1,6 +1,10 @@
 const Joi = require('joi');
 const ErrorMessages = require('../utils/errorMessages');
 
+const REGEX_PATTERNS = {
+  EMAIL_BASIC: /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+};
+
 const formSchema = Joi.object({
   name: Joi.string()
     .trim()
@@ -15,13 +19,13 @@ const formSchema = Joi.object({
 
   email: Joi.string()
     .trim()
-    .email()
+    .regex(REGEX_PATTERNS.EMAIL_BASIC)
     .max(255)
     .required()
     .messages({
       'string.empty': ErrorMessages.VALIDATION.EMAIL_REQUIRED,
       'any.required': ErrorMessages.VALIDATION.EMAIL_REQUIRED,
-      'string.email': ErrorMessages.VALIDATION.EMAIL_INVALID,
+      'string.pattern.base': ErrorMessages.VALIDATION.EMAIL_INVALID,
       'string.max': ErrorMessages.VALIDATION.EMAIL_TOO_LONG
     }),
 

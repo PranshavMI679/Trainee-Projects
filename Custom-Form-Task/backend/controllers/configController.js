@@ -29,14 +29,14 @@ exports.createFormLayout = async (req, res, next) => {
 
       const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
       
-      const allowsOptions = ['dropdown', 'radio', 'radioselection', 'currency'].includes(normalizedType);
-
       let processedOptions = null;
-      if (allowsOptions && field.options) {
-        if (Array.isArray(field.options)) {
-          processedOptions = field.options.map(o => String(o).trim());
-        } else if (typeof field.options === 'object') {
-          processedOptions = field.options;
+      if (normalizedType === 'dropdown' || normalizedType === 'radio' || normalizedType === 'radioselection' || normalizedType === 'currency') {
+        if (field.options) {
+          if (Array.isArray(field.options)) {
+            processedOptions = field.options.map(o => String(o).trim());
+          } else if (typeof field.options === 'object') {
+            processedOptions = field.options;
+          }
         }
       }
 
@@ -46,7 +46,7 @@ exports.createFormLayout = async (req, res, next) => {
         key: field.key.trim(),
         label: field.label.trim(),
         type: field.type.trim(),
-        is_required: !!field.is_required,
+        is_required: field.is_required === true || field.is_required === 'true' ? true : false,
         length: field.length || null,
         options: processedOptions
       };
@@ -64,7 +64,10 @@ exports.createFormLayout = async (req, res, next) => {
       config_code: unifiedFormConfigCode 
     });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
+    try {
+      await t.rollback();
+    } catch (rollbackErr) {
+    }
     return next(error);
   }
 };
@@ -80,15 +83,17 @@ exports.getClientLayout = async (req, res, next) => {
 
     const layouts = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
 
-    const formattedFields = layouts.map(layout => ({
-      config_code: layout.config_code,
-      key: layout.key,
-      label: layout.label,
-      type: layout.type,
-      is_required: layout.is_required,
-      length: layout.length,
-      options: layout.options 
-    }));
+    const formattedFields = layouts.map(layout => {
+      return {
+        config_code: layout.config_code,
+        key: layout.key,
+        label: layout.label,
+        type: layout.type,
+        is_required: layout.is_required,
+        length: layout.length,
+        options: layout.options 
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -124,25 +129,35 @@ exports.editConfiglayout = async (req, res, next) => {
       return next(new AppError("Target field layout configuration element not found.", 404));
     }
 
-    const currentType = type ? type.trim() : existingLayout.type;
-    const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const allowsOptions = ['dropdown', 'radio', 'radioselection', 'currency'].includes(normalizedType);
+    let currentType = existingLayout.type;
+    if (type) {
+      currentType = type.trim();
+    }
 
+    const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
     let processedOptions = existingLayout.options;
-    if (allowsOptions && options) {
-      if (Array.isArray(options)) {
-        processedOptions = options.map(o => String(o).trim());
-      } else if (typeof options === 'object') {
-        processedOptions = options;
+    if (normalizedType === 'dropdown' || normalizedType === 'radio' || normalizedType === 'radioselection' || normalizedType === 'currency') {
+      if (options) {
+        if (Array.isArray(options)) {
+          processedOptions = options.map(o => String(o).trim());
+        } else if (typeof options === 'object') {
+          processedOptions = options;
+        }
       }
-    } else if (!allowsOptions) {
+    } else {
       processedOptions = null;
+    }
+
+    let checkRequired = existingLayout.is_required;
+    if (is_required !== undefined) {
+      checkRequired = is_required === true || is_required === 'true' ? true : false;
     }
 
     await FormConfig.update({
       label: label ? label.trim() : existingLayout.label,
       type: currentType,
-      is_required: is_required !== undefined ? !!is_required : existingLayout.is_required,
+      is_required: checkRequired,
       length: length || existingLayout.length,
       options: processedOptions
     }, { 
@@ -159,7 +174,10 @@ exports.editConfiglayout = async (req, res, next) => {
       key
     });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
+    try {
+      await t.rollback();
+    } catch (rollbackErr) {
+    }
     return next(error);
   }
 };
@@ -187,7 +205,7 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     });
 
     await Form.update(
-      { custom_values: sequelize.literal(`custom_values - '${key.trim()}'`) },
+      { custom_values: sequelize.literal("custom_values - '" + key.trim() + "'") },
       { where: { client_id: currentClientId }, transaction: t }
     );
 
@@ -195,10 +213,13 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: `Form field element key '${key}' and related historical entries cleared successfully.`
+      message: "Form field element key '" + key + "' and related historical entries cleared successfully."
     });
   } catch (error) {
-    if (t && !t.finished) await t.rollback();
+    try {
+      await t.rollback();
+    } catch (rollbackErr) {
+    }
     return next(error);
   }
 };
