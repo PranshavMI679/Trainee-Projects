@@ -159,10 +159,10 @@ const configValidation = async (req, res, next) => {
           });
           break;
 
-        case 'fileupload':
-        case 'file':
-          joiFieldSchema = Joi.any().optional();
-          break;
+        // case 'fileupload':
+        // case 'file':
+        //   joiFieldSchema = Joi.any().optional();
+        //   break;
 
         default:
           joiFieldSchema = Joi.any();

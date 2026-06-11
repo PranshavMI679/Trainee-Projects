@@ -30,22 +30,22 @@ exports.createFormLayout = async (req, res, next) => {
       const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
       
     let processedOptions = null;
-    if (field.options && typeof field.options === 'object') {
-      const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (field.options && typeof field.options === 'object') {
+        const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
   
-    if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
-      processedOptions = {
-        is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-        value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : []
-      };
-    } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
-      processedOptions = {
-        is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-        thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
-        decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
-      };
-    }
-  }
+      if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
+        processedOptions = {
+          is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
+          value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : []
+        };
+      } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
+        processedOptions = {
+          is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
+          thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
+          decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
+        };
+      }
+      }
       return {
         config_code: unifiedFormConfigCode,
         client_id: targetClient.client_id,
