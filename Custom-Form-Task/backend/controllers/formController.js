@@ -131,6 +131,111 @@ exports.getEmployeeDetails = async (req, res, next) => {
   }
 };
 
+exports.processFormDetails = async (req, res, next) => {
+  try {
+    const { code } = req.params; 
+    const { name, email, custom_values } = req.body;
+
+    let record;
+    let fieldsConfig;
+    let finalCustomValues = {};
+    let isNewSubmission = false;
+    let clientId;
+
+    const targetClient = await Client.findOne({ where: { client_code: code } });
+
+    if (targetClient) {
+      isNewSubmission = true;
+      clientId = targetClient.client_id;
+      finalCustomValues = custom_values || {};
+
+      if (!name || !email) {
+        return next(new AppError("Root parameters 'name' and 'email' are strictly required for new submissions.", 400));
+      }
+    } else {
+      record = await Form.findOne({ where: { employee_code: code } });
+      if (!record) {
+        return next(new AppError("The provided code does not match any active client layout or employee record.", 404));
+      }
+      clientId = record.client_id;
+
+      finalCustomValues = record.custom_values ? { ...record.custom_values } : {};
+      
+      if (custom_values && typeof custom_values === 'object') {
+        const inputKeys = Object.keys(custom_values);
+        for (let i = 0; i < inputKeys.length; i++) {
+          const key = inputKeys[i];
+          const currentInput = custom_values[key];
+
+          if (currentInput === null || currentInput === undefined || (typeof currentInput === 'string' && currentInput.trim() === "")) {
+            delete finalCustomValues[key];
+          } else {
+            finalCustomValues[key] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
+          }
+        }
+      }
+    }
+
+    fieldsConfig = await FormConfig.findAll({ where: { client_id: clientId } });
+    
+    for (let i = 0; i < fieldsConfig.length; i++) {
+      const field = fieldsConfig[i];
+      if (field.is_required) {
+        const value = finalCustomValues[field.key];
+        
+        if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
+          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+        }
+
+        if (typeof value === 'string' && value.trim() === "") {
+          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
+        }
+      }
+    }
+
+    if (isNewSubmission) {
+      record = await Form.create({
+        client_id: clientId,
+        name,
+        email,
+        custom_values: finalCustomValues
+      });
+    } else {
+      await record.update({
+        name: name !== undefined ? name : record.name,
+        email: email !== undefined ? email : record.email,
+        custom_values: finalCustomValues
+      });
+    }
+
+    const formattedConfig = fieldsConfig.map(field => ({
+      config_code: field.config_code,
+      label: field.label,
+      key: field.key,
+      type: field.type,
+      options: field.options,
+      value: record.custom_values && record.custom_values[field.key] !== undefined 
+        ? record.custom_values[field.key] 
+        : null
+    }));
+
+    return res.status(isNewSubmission ? 201 : 200).json({
+      success: true,
+      message: isNewSubmission ? "Employee data captured successfully." : "Employee data updated successfully.",
+      id: record.employee_id,
+      employee_code: record.employee_code,
+      name: record.name,
+      email: record.email,
+      config: formattedConfig
+    });
+
+  } catch (error) {
+    return next(error);
+  }
+};
+
+
+/*
 exports.enterDetails = async (req, res, next) => {
   try {
     const { client_code } = req.params; 
@@ -261,3 +366,5 @@ exports.editFormDetails = async (req, res, next) => {
     return next(error);
   }
 };
+*/
+

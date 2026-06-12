@@ -3,6 +3,186 @@ const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 const { v4: uuidv4 } = require('uuid');
 
+exports.getClientLayout = async (req, res, next) => {
+  try {
+    const { client_code } = req.params;
+
+    const targetClient = await Client.findOne({ where: { client_code } });
+    if (!targetClient) {
+      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+    }
+
+    const layouts = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
+
+    const formattedFields = layouts.map(layout => {
+      return {
+        config_code: layout.config_code,
+        key: layout.key,
+        label: layout.label,
+        type: layout.type,
+        is_required: layout.is_required,
+        length: layout.length,
+        options: layout.options 
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      client_id: targetClient.client_id,
+      client_code: targetClient.client_code,
+      client_name: targetClient.client_name,
+      fields_count: formattedFields.length,
+      fields: formattedFields
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+exports.processConfigLayout = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { identifier } = req.params; 
+    const { fields, key, label, type, is_required, length, options } = req.body;
+
+    const targetClient = await Client.findOne({ where: { client_code: identifier }, transaction: t });
+
+    if (targetClient) {
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        await t.rollback();
+        return next(new AppError("Fields payload must be a non-empty array.", 400));
+      }
+
+      const unifiedFormConfigCode = uuidv4();
+
+      const bulkInsertPayload = fields.map(field => {
+        if (!field.key || !field.label || !field.type) {
+          throw new AppError("Each field structure must possess a valid key, label, and type.", 400);
+        }
+
+        const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        let processedOptions = null;
+        if (field.options && typeof field.options === 'object') {
+          if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
+            processedOptions = {
+              is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
+              value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : []
+            };
+          } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
+            processedOptions = {
+              is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
+              thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
+              decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
+            };
+          }
+        }
+
+        const enforcedLength = ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null);
+
+        return {
+          config_code: unifiedFormConfigCode,
+          client_id: targetClient.client_id,
+          key: field.key.trim(),
+          label: field.label.trim(),
+          type: field.type.trim(),
+          is_required: field.is_required === true || field.is_required === 'true' ? true : false,
+          length: enforcedLength,
+          options: processedOptions
+        };
+      });
+
+      await FormConfig.bulkCreate(bulkInsertPayload, { transaction: t });
+      await t.commit();
+
+      return res.status(201).json({
+        success: true,
+        message: "Form configuration fields registered successfully under a single layout template.",
+        client_id: targetClient.client_id,
+        client_code: targetClient.client_code,
+        fields_count: fields.length,
+        config_code: unifiedFormConfigCode 
+      });
+
+    } else {
+      if (!key) {
+        await t.rollback();
+        return next(new AppError("Field identifier 'key' parameter is required to edit layout elements.", 400));
+      }
+
+      const existingLayout = await FormConfig.findOne({ 
+        where: { config_code: identifier, key: key.trim() }, 
+        transaction: t 
+      });
+
+      if (!existingLayout) {
+        await t.rollback();
+        return next(new AppError("Target field layout configuration element not found.", 404));
+      }
+
+      let currentType = existingLayout.type;
+      if (type) {
+        currentType = type.trim();
+      }
+
+      const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      let processedOptions = existingLayout.options;
+      if (options && typeof options === 'object') {
+        if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
+          processedOptions = {
+            is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
+            value: Array.isArray(options.value) ? options.value.map(o => String(o).trim()) : []
+          };
+        } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
+          processedOptions = {
+            is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
+            thousand_separator: options.thousand_separator !== undefined ? String(options.thousand_separator) : ',',
+            decimal_separator: options.decimal_separator !== undefined ? String(options.decimal_separator) : '.'
+          };
+        }
+      }
+
+      let checkRequired = existingLayout.is_required;
+      if (is_required !== undefined) {
+        checkRequired = is_required === true || is_required === 'true' ? true : false;
+      }
+
+      let finalLength = length || existingLayout.length;
+      if (['date', 'datetime'].includes(normalizedType)) {
+        finalLength = null;
+      }
+
+      await FormConfig.update({
+        label: label ? label.trim() : existingLayout.label,
+        type: currentType,
+        is_required: checkRequired,
+        length: finalLength,
+        options: processedOptions
+      }, { 
+        where: { config_code: identifier, key: key.trim() }, 
+        transaction: t 
+      });
+
+      await t.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: "Form configuration element template updated successfully.",
+        config_code: identifier,
+        key: key.trim()
+      });
+    }
+  } catch (error) {
+    try {
+      await t.rollback();
+    } catch (rollbackErr) {
+    }
+    return next(error);
+  }
+};
+
+/*
 exports.createFormLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
@@ -75,42 +255,6 @@ exports.createFormLayout = async (req, res, next) => {
       await t.rollback();
     } catch (rollbackErr) {
     }
-    return next(error);
-  }
-};
-
-exports.getClientLayout = async (req, res, next) => {
-  try {
-    const { client_code } = req.params;
-
-    const targetClient = await Client.findOne({ where: { client_code } });
-    if (!targetClient) {
-      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
-    }
-
-    const layouts = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
-
-    const formattedFields = layouts.map(layout => {
-      return {
-        config_code: layout.config_code,
-        key: layout.key,
-        label: layout.label,
-        type: layout.type,
-        is_required: layout.is_required,
-        length: layout.length,
-        options: layout.options 
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-      client_id: targetClient.client_id,
-      client_code: targetClient.client_code,
-      client_name: targetClient.client_name,
-      fields_count: formattedFields.length,
-      fields: formattedFields
-    });
-  } catch (error) {
     return next(error);
   }
 };
@@ -196,6 +340,7 @@ exports.editConfiglayout = async (req, res, next) => {
     return next(error);
   }
 };
+*/
 
 exports.deleteFieldFromLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
@@ -203,21 +348,28 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     const { config_code, key } = req.params;
 
     const existingLayout = await FormConfig.findOne({ 
-      where: { config_code, key: key.trim() }, 
+      where: { 
+        config_code, 
+        key: key.trim(),
+        is_delete: false 
+      }, 
       transaction: t 
     });
 
     if (!existingLayout) {
       await t.rollback();
-      return next(new AppError("The specified field configuration element was not found.", 404));
+      return next(new AppError("The specified field configuration element was not found or has already been deleted.", 404));
     }
 
     const currentClientId = existingLayout.client_id;
 
-    await FormConfig.destroy({ 
-      where: { config_code, key: key.trim() }, 
-      transaction: t 
-    });
+    await FormConfig.update(
+      { is_delete: true },
+      { 
+        where: { config_code, key: key.trim() }, 
+        transaction: t 
+      }
+    );
 
     await Form.update(
       { custom_values: sequelize.literal("custom_values - '" + key.trim() + "'") },
@@ -228,7 +380,7 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "Form field element key '" + key + "' and related historical entries cleared successfully."
+      message: `Form field element key '${key.trim()}' was successfully soft-deleted and removed from historical submission payloads.`
     });
   } catch (error) {
     try {

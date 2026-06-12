@@ -22,7 +22,7 @@ const configValidation = async (req, res, next) => {
       }
 
       const layoutTemplate = await FormConfig.findOne({ 
-        where: { client_id: targetClient.client_id } 
+        where: { client_id: targetClient.client_id, is_delete: false } 
       });
       
       if (layoutTemplate) {
@@ -37,7 +37,7 @@ const configValidation = async (req, res, next) => {
       }
 
       const layoutTemplate = await FormConfig.findOne({ 
-        where: { client_id: employeeRecord.client_id } 
+        where: { client_id: employeeRecord.client_id, is_delete: false } 
       });
       
       if (layoutTemplate) {
@@ -53,10 +53,10 @@ const configValidation = async (req, res, next) => {
       return next(new AppError("Configuration template code is required to enforce field rules.", 400));
     }
 
-    const rules = await FormConfig.findAll({ where: { config_code } });
+    const rules = await FormConfig.findAll({ where: { config_code, is_delete: false } });
 
     if (!rules || rules.length === 0) {
-      return next(new AppError("The provided form configuration layout code does not exist.", 404));
+      return next(new AppError("The provided form configuration layout code does not exist or has no active fields.", 404));
     }
 
     const dynamicJoiRules = {};
