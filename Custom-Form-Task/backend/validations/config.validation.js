@@ -22,19 +22,15 @@ const VALID_TYPES = [
   'file', 'File'
 ];
 
-// Universal sub-schema validation block for options object parameters
 const optionsSchema = Joi.object({
   is_multiple: Joi.boolean().required().messages({
     'any.required': 'The is_multiple selection parameter flag is required.'
   }),
-  // Required only for choice list fields
   value: Joi.array().items(Joi.string().trim().required()).min(1).optional().messages({
     'array.min': 'The options value configuration list requires at least one option item entry.'
   }),
-  // Allowed for numeric display configurations
   thousand_separator: Joi.string().trim().allow(',', '.', ' ', '').optional(),
   decimal_separator: Joi.string().trim().allow(',', '.', '').optional(),
-  decimal_separtor: Joi.string().trim().allow(',', '.', '').optional() // Typo safety fallback matching input payload variations
 });
 
 const singleFieldSchema = Joi.object({

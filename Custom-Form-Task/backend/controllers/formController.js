@@ -198,7 +198,7 @@ exports.editFormDetails = async (req, res, next) => {
       return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
     }
 
-    let existingValues = record.custom_values || {};
+    let existingValues = record.custom_values ? { ...record.custom_values } : {};
     
     if (custom_values && typeof custom_values === 'object') {
       const inputKeys = Object.keys(custom_values);

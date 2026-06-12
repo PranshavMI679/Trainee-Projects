@@ -29,23 +29,24 @@ exports.createFormLayout = async (req, res, next) => {
 
       const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
       
-    let processedOptions = null;
+      let processedOptions = null;
       if (field.options && typeof field.options === 'object') {
-        const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
-      if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
-        processedOptions = {
-          is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-          value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : []
-        };
-      } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
-        processedOptions = {
-          is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-          thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
-          decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
-        };
+        if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
+          processedOptions = {
+            is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
+            value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : []
+          };
+        } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
+          processedOptions = {
+            is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
+            thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
+            decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
+          };
+        }
       }
-      }
+
+      const enforcedLength = ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null);
+
       return {
         config_code: unifiedFormConfigCode,
         client_id: targetClient.client_id,
@@ -53,7 +54,7 @@ exports.createFormLayout = async (req, res, next) => {
         label: field.label.trim(),
         type: field.type.trim(),
         is_required: field.is_required === true || field.is_required === 'true' ? true : false,
-        length: field.length || null,
+        length: enforcedLength,
         options: processedOptions
       };
     });
@@ -144,32 +145,35 @@ exports.editConfiglayout = async (req, res, next) => {
     
     let processedOptions = existingLayout.options;
     if (options && typeof options === 'object') {
-      const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
-      processedOptions = {
-        is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
-        value: Array.isArray(options.value) ? options.value.map(o => String(o).trim()) : []
-      };
-    } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
-      processedOptions = {
-        is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
-        thousand_separator: options.thousand_separator !== undefined ? String(options.thousand_separator) : ',',
-        decimal_separator: options.decimal_separator !== undefined ? String(options.decimal_separator) : '.'
-          };
-        }
+      if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
+        processedOptions = {
+          is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
+          value: Array.isArray(options.value) ? options.value.map(o => String(o).trim()) : []
+        };
+      } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
+        processedOptions = {
+          is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
+          thousand_separator: options.thousand_separator !== undefined ? String(options.thousand_separator) : ',',
+          decimal_separator: options.decimal_separator !== undefined ? String(options.decimal_separator) : '.'
+        };
       }
+    }
 
     let checkRequired = existingLayout.is_required;
     if (is_required !== undefined) {
       checkRequired = is_required === true || is_required === 'true' ? true : false;
     }
 
+    let finalLength = length || existingLayout.length;
+    if (['date', 'datetime'].includes(normalizedType)) {
+      finalLength = null;
+    }
+
     await FormConfig.update({
       label: label ? label.trim() : existingLayout.label,
       type: currentType,
       is_required: checkRequired,
-      length: length || existingLayout.length,
+      length: finalLength,
       options: processedOptions
     }, { 
       where: { config_code, key: key.trim() }, 

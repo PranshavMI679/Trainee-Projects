@@ -4,7 +4,9 @@ const AppError = require('../utils/appError');
 
 const REGEX_PATTERNS = {
   URL: /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/,
-  EMAIL_BASIC: /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+  EMAIL_BASIC: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
+  EXACT_DATE: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/,
+  EXACT_DATETIME: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) (0\d|1\d|2[0-4]):[0-5]\d:[0-5]\d$/
 };
 
 const configValidation = async (req, res, next) => {
@@ -108,9 +110,14 @@ const configValidation = async (req, res, next) => {
           break;
 
         case 'date':
+          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EXACT_DATE).messages({
+            'string.pattern.base': `Custom field '${rule.label}' layout error. Must be a valid date formatted strictly as yyyy-mm-dd (mm: 01-12, dd: 01-31).`
+          });
+          break;
+
         case 'datetime':
-          joiFieldSchema = Joi.date().messages({
-            'date.base': `Custom field '${rule.label}' requires a valid date representation.`
+          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EXACT_DATETIME).messages({
+            'string.pattern.base': `Custom field '${rule.label}' layout error. Must be a valid date/time formatted strictly as yyyy-mm-dd hh:mm:ss (hh: 00-24, mm/ss: 00-59).`
           });
           break;
 
@@ -158,11 +165,6 @@ const configValidation = async (req, res, next) => {
             'string.pattern.base': `Custom field '${rule.label}' must map to a valid web URL link destination address.`
           });
           break;
-
-        // case 'fileupload':
-        // case 'file':
-        //   joiFieldSchema = Joi.any().optional();
-        //   break;
 
         default:
           joiFieldSchema = Joi.any();
