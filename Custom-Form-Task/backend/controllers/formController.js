@@ -10,7 +10,7 @@ exports.getFormLayout = async (req, res, next) => {
     if (!targetClient) {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
-
+                                                                                                                                                                                                                                           
     const fields = await FormConfig.findAll({
       where: { client_id: targetClient.client_id }
     });
@@ -158,7 +158,6 @@ exports.processFormDetails = async (req, res, next) => {
         return next(new AppError("The provided code does not match any active client layout or employee record.", 404));
       }
       clientId = record.client_id;
-
       finalCustomValues = record.custom_values ? { ...record.custom_values } : {};
       
       if (custom_values && typeof custom_values === 'object') {
@@ -176,7 +175,17 @@ exports.processFormDetails = async (req, res, next) => {
       }
     }
 
-    fieldsConfig = await FormConfig.findAll({ where: { client_id: clientId } });
+    const allFields = await FormConfig.findAll({ where: { client_id: clientId } });
+    
+    fieldsConfig = [];
+    for (let i = 0; i < allFields.length; i++) {
+      const fieldItem = allFields[i];
+      const fieldOpts = fieldItem.options || {};
+      
+      if (fieldOpts.is_deleted_field !== true && fieldOpts.is_deleted_field !== 'true') {
+        fieldsConfig.push(fieldItem);
+      }
+    }
     
     for (let i = 0; i < fieldsConfig.length; i++) {
       const field = fieldsConfig[i];
@@ -208,16 +217,24 @@ exports.processFormDetails = async (req, res, next) => {
       });
     }
 
-    const formattedConfig = fieldsConfig.map(field => ({
-      config_code: field.config_code,
-      label: field.label,
-      key: field.key,
-      type: field.type,
-      options: field.options,
-      value: record.custom_values && record.custom_values[field.key] !== undefined 
-        ? record.custom_values[field.key] 
-        : null
-    }));
+    const formattedConfig = [];
+    for (let i = 0; i < fieldsConfig.length; i++) {
+      const field = fieldsConfig[i];
+      
+      let finalValue = null;
+      if (record.custom_values && record.custom_values[field.key] !== undefined) {
+        finalValue = record.custom_values[field.key];
+      }
+
+      formattedConfig.push({
+        config_code: field.config_code,
+        label: field.label,
+        key: field.key,
+        type: field.type,
+        options: field.options,
+        value: finalValue
+      });
+    }
 
     return res.status(isNewSubmission ? 201 : 200).json({
       success: true,
@@ -233,138 +250,3 @@ exports.processFormDetails = async (req, res, next) => {
     return next(error);
   }
 };
-
-
-/*
-exports.enterDetails = async (req, res, next) => {
-  try {
-    const { client_code } = req.params; 
-    const { name, email, custom_values } = req.body;
-
-    const targetClient = await Client.findOne({ where: { client_code } });
-    if (!targetClient) {
-      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
-    }
-
-    const fieldsConfig = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
-    
-    for (let i = 0; i < fieldsConfig.length; i++) {
-      const field = fieldsConfig[i];
-      if (field.is_required) {
-        const value = custom_values ? custom_values[field.key] : undefined;
-        
-        if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
-          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
-        }
-
-        if (typeof value === 'string' && value.trim() === "") {
-          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
-        }
-      }
-    }
-
-    const record = await Form.create({
-      client_id: targetClient.client_id,
-      name,
-      email,
-      custom_values: custom_values || {}
-    });
-
-    const formattedConfig = fieldsConfig.map(field => ({
-      config_code: field.config_code,
-      label: field.label,
-      key: field.key,
-      type: field.type,
-      options: field.options,
-      value: custom_values && custom_values[field.key] !== undefined ? custom_values[field.key] : null
-    }));
-
-    return res.status(201).json({
-      success: true,
-      message: "Employee data captured successfully.",
-      id: record.employee_id,
-      employee_code: record.employee_code,
-      name: record.name,
-      email: record.email,
-      config: formattedConfig
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-exports.editFormDetails = async (req, res, next) => {
-  try {
-    const { employee_code } = req.params; 
-    const { name, email, custom_values } = req.body;
-
-    const record = await Form.findOne({ where: { employee_code } });
-    if (!record) {
-      return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
-    }
-
-    let existingValues = record.custom_values ? { ...record.custom_values } : {};
-    
-    if (custom_values && typeof custom_values === 'object') {
-      const inputKeys = Object.keys(custom_values);
-      for (let i = 0; i < inputKeys.length; i++) {
-        const key = inputKeys[i];
-        const currentInput = custom_values[key];
-
-        if (currentInput === null || currentInput === undefined) {
-          delete existingValues[key];
-        } else {
-          existingValues[key] = currentInput;
-        }
-      }
-    }
-
-    const fieldsConfig = await FormConfig.findAll({ where: { client_id: record.client_id } });
-
-    for (let i = 0; i < fieldsConfig.length; i++) {
-      const field = fieldsConfig[i];
-      if (field.is_required) {
-        const value = existingValues[field.key];
-        
-        if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
-          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
-        }
-
-        if (typeof value === 'string' && value.trim() === "") {
-          return next(new AppError(`The dynamic field '${field.label}' is marked mandatory.`, 400));
-        }
-      }
-    }
-
-    await record.update({
-      name: name !== undefined ? name : record.name,
-      email: email !== undefined ? email : record.email,
-      custom_values: existingValues
-    });
-
-    const formattedConfig = fieldsConfig.map(field => ({
-      config_code: field.config_code,
-      label: field.label,
-      key: field.key,
-      type: field.type,
-      options: field.options,
-      value: record.custom_values && record.custom_values[field.key] !== undefined 
-        ? record.custom_values[field.key] 
-        : null
-    }));
-
-    return res.status(200).json({
-      success: true,
-      message: "Employee data updated successfully.",
-      id: record.employee_id,
-      employee_code: record.employee_code,
-      name: record.name,
-      email: record.email,
-      config: formattedConfig
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-*/
-

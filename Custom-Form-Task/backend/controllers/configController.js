@@ -43,7 +43,7 @@ exports.processConfigLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const { identifier } = req.params; 
-    const { fields, key, label, type, is_required, length, options } = req.body;
+    let { fields, key, label, type, is_required, length, options } = req.body;
 
     const targetClient = await Client.findOne({ where: { client_code: identifier }, transaction: t });
 
@@ -54,31 +54,23 @@ exports.processConfigLayout = async (req, res, next) => {
       }
 
       const unifiedFormConfigCode = uuidv4();
-
       const bulkInsertPayload = fields.map(field => {
         if (!field.key || !field.label || !field.type) {
           throw new AppError("Each field structure must possess a valid key, label, and type.", 400);
         }
 
         const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
-        
-        let processedOptions = null;
-        if (field.options && typeof field.options === 'object') {
-          if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
-            processedOptions = {
-              is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-              value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : []
-            };
-          } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
-            processedOptions = {
-              is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-              thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
-              decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
-            };
-          }
-        }
+        const targetCanDelete = field.options && field.options.can_delete !== undefined 
+          ? (field.options.can_delete === true || field.options.can_delete === 'true') 
+          : true;
 
-        const enforcedLength = ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null);
+        const processedOptions = {
+          is_multiple: field.options ? (field.options.is_multiple === true || field.options.is_multiple === 'true') : false,
+          can_delete: targetCanDelete,
+          value: field.options && Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : [],
+          thousand_separator: field.options && field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
+          decimal_separator: field.options && field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
+        };
 
         return {
           config_code: unifiedFormConfigCode,
@@ -86,9 +78,10 @@ exports.processConfigLayout = async (req, res, next) => {
           key: field.key.trim(),
           label: field.label.trim(),
           type: field.type.trim(),
-          is_required: field.is_required === true || field.is_required === 'true' ? true : false,
-          length: enforcedLength,
-          options: processedOptions
+          is_required: field.is_required === true || field.is_required === 'true',
+          length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null),
+          options: processedOptions,
+          is_delete: false 
         };
       });
 
@@ -97,282 +90,132 @@ exports.processConfigLayout = async (req, res, next) => {
 
       return res.status(201).json({
         success: true,
-        message: "Form configuration fields registered successfully under a single layout template.",
-        client_id: targetClient.client_id,
-        client_code: targetClient.client_code,
-        fields_count: fields.length,
+        message: "Form configuration fields registered successfully.",
         config_code: unifiedFormConfigCode 
       });
 
     } else {
-      if (!key) {
-        await t.rollback();
-        return next(new AppError("Field identifier 'key' parameter is required to edit layout elements.", 400));
+      if (!fields || !Array.isArray(fields)) {
+        if (!key) {
+          await t.rollback();
+          return next(new AppError("Field identifier 'key' parameter is required.", 400));
+        }
+        fields = [{ key, label, type, is_required, length, options }];
       }
 
-      const existingLayout = await FormConfig.findOne({ 
-        where: { config_code: identifier, key: key.trim() }, 
-        transaction: t 
-      });
+      for (let i = 0; i < fields.length; i++) {
+        const field = fields[i];
+        const targetKey = field.key ? field.key.trim() : '';
 
-      if (!existingLayout) {
-        await t.rollback();
-        return next(new AppError("Target field layout configuration element not found.", 404));
-      }
+        const existingLayout = await FormConfig.findOne({ 
+          where: { config_code: identifier, key: targetKey }, 
+          transaction: t 
+        });
 
-      let currentType = existingLayout.type;
-      if (type) {
-        currentType = type.trim();
-      }
+        if (!existingLayout) {
+          await t.rollback();
+          return next(new AppError(`Target field layout not found for key '${targetKey}'.`, 404));
+        }
 
-      const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
-      
-      let processedOptions = existingLayout.options;
-      if (options && typeof options === 'object') {
-        if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
+        if (field.is_delete === true || field.is_delete === 'true') {
+          const currentOptions = existingLayout.options || {};
+          
+          if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
+            await t.rollback();
+            return next(new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403));
+          }
+
+          await FormConfig.update(
+            { is_delete: true },
+            { where: { config_code: identifier, key: targetKey }, transaction: t }
+          );
+
+          await Form.update(
+            { custom_values: sequelize.literal("custom_values - '" + targetKey + "'") },
+            { where: { client_id: existingLayout.client_id }, transaction: t }
+          );
+          continue; 
+        }
+
+        let currentType = field.type ? field.type.trim() : existingLayout.type;
+        const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let processedOptions = existingLayout.options || {};
+
+        if (field.options && typeof field.options === 'object') {
           processedOptions = {
-            is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
-            value: Array.isArray(options.value) ? options.value.map(o => String(o).trim()) : []
-          };
-        } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
-          processedOptions = {
-            is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
-            thousand_separator: options.thousand_separator !== undefined ? String(options.thousand_separator) : ',',
-            decimal_separator: options.decimal_separator !== undefined ? String(options.decimal_separator) : '.'
+            is_multiple: field.options.is_multiple !== undefined ? (field.options.is_multiple === true || field.options.is_multiple === 'true') : !!processedOptions.is_multiple,
+            can_delete: field.options.can_delete !== undefined ? (field.options.can_delete === true || field.options.can_delete === 'true') : (processedOptions.can_delete !== undefined ? processedOptions.can_delete : true),
+            value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : (processedOptions.value || []),
+            thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : (processedOptions.thousand_separator || ','),
+            decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : (processedOptions.decimal_separator || '.')
           };
         }
-      }
 
-      let checkRequired = existingLayout.is_required;
-      if (is_required !== undefined) {
-        checkRequired = is_required === true || is_required === 'true' ? true : false;
+        await FormConfig.update({
+          label: field.label ? field.label.trim() : existingLayout.label,
+          type: currentType,
+          is_required: field.is_required !== undefined ? (field.is_required === true || field.is_required === 'true') : existingLayout.is_required,
+          length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || existingLayout.length),
+          options: processedOptions
+        }, { 
+          where: { config_code: identifier, key: targetKey }, 
+          transaction: t 
+        });
       }
-
-      let finalLength = length || existingLayout.length;
-      if (['date', 'datetime'].includes(normalizedType)) {
-        finalLength = null;
-      }
-
-      await FormConfig.update({
-        label: label ? label.trim() : existingLayout.label,
-        type: currentType,
-        is_required: checkRequired,
-        length: finalLength,
-        options: processedOptions
-      }, { 
-        where: { config_code: identifier, key: key.trim() }, 
-        transaction: t 
-      });
 
       await t.commit();
-
       return res.status(200).json({
         success: true,
-        message: "Form configuration element template updated successfully.",
-        config_code: identifier,
-        key: key.trim()
+        message: "Form configuration updated successfully.",
+        config_code: identifier
       });
     }
   } catch (error) {
-    try {
-      await t.rollback();
-    } catch (rollbackErr) {
-    }
+    try { await t.rollback(); } catch (e) {}
     return next(error);
   }
 };
-
-/*
-exports.createFormLayout = async (req, res, next) => {
-  const t = await sequelize.transaction();
-  try {
-    const { fields } = req.body;
-    const { client_code } = req.params;
-
-    if (!fields || !Array.isArray(fields) || fields.length === 0) {
-      await t.rollback();
-      return next(new AppError("Fields payload must be a non-empty array.", 400));
-    }
-
-    const targetClient = await Client.findOne({ where: { client_code }, transaction: t });
-    if (!targetClient) {
-      await t.rollback();
-      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
-    }
-
-    const unifiedFormConfigCode = uuidv4();
-
-    const bulkInsertPayload = fields.map(field => {
-      if (!field.key || !field.label || !field.type) {
-        throw new AppError("Each field structure must possess a valid key, label, and type.", 400);
-      }
-
-      const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
-      
-      let processedOptions = null;
-      if (field.options && typeof field.options === 'object') {
-        if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
-          processedOptions = {
-            is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-            value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : []
-          };
-        } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
-          processedOptions = {
-            is_multiple: field.options.is_multiple === true || field.options.is_multiple === 'true' ? true : false,
-            thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
-            decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
-          };
-        }
-      }
-
-      const enforcedLength = ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null);
-
-      return {
-        config_code: unifiedFormConfigCode,
-        client_id: targetClient.client_id,
-        key: field.key.trim(),
-        label: field.label.trim(),
-        type: field.type.trim(),
-        is_required: field.is_required === true || field.is_required === 'true' ? true : false,
-        length: enforcedLength,
-        options: processedOptions
-      };
-    });
-
-    await FormConfig.bulkCreate(bulkInsertPayload, { transaction: t });
-    await t.commit();
-
-    return res.status(201).json({
-      success: true,
-      message: "Form configuration fields registered successfully under a single layout template.",
-      client_id: targetClient.client_id,
-      client_code: targetClient.client_code,
-      fields_count: fields.length,
-      config_code: unifiedFormConfigCode 
-    });
-  } catch (error) {
-    try {
-      await t.rollback();
-    } catch (rollbackErr) {
-    }
-    return next(error);
-  }
-};
-
-exports.editConfiglayout = async (req, res, next) => {
-  const t = await sequelize.transaction();
-  try {
-    const { config_code } = req.params;
-    const { key, label, type, is_required, length, options } = req.body;
-
-    if (!key) {
-      await t.rollback();
-      return next(new AppError("Field identifier 'key' parameter is required to edit layout elements.", 400));
-    }
-
-    const existingLayout = await FormConfig.findOne({ 
-      where: { config_code, key: key.trim() }, 
-      transaction: t 
-    });
-
-    if (!existingLayout) {
-      await t.rollback();
-      return next(new AppError("Target field layout configuration element not found.", 404));
-    }
-
-    let currentType = existingLayout.type;
-    if (type) {
-      currentType = type.trim();
-    }
-
-    const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
-    
-    let processedOptions = existingLayout.options;
-    if (options && typeof options === 'object') {
-      if (['dropdown', 'radio', 'radioselection', 'checkbox'].includes(normalizedType)) {
-        processedOptions = {
-          is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
-          value: Array.isArray(options.value) ? options.value.map(o => String(o).trim()) : []
-        };
-      } else if (['number', 'decimal', 'percent'].includes(normalizedType)) {
-        processedOptions = {
-          is_multiple: options.is_multiple === true || options.is_multiple === 'true' ? true : false,
-          thousand_separator: options.thousand_separator !== undefined ? String(options.thousand_separator) : ',',
-          decimal_separator: options.decimal_separator !== undefined ? String(options.decimal_separator) : '.'
-        };
-      }
-    }
-
-    let checkRequired = existingLayout.is_required;
-    if (is_required !== undefined) {
-      checkRequired = is_required === true || is_required === 'true' ? true : false;
-    }
-
-    let finalLength = length || existingLayout.length;
-    if (['date', 'datetime'].includes(normalizedType)) {
-      finalLength = null;
-    }
-
-    await FormConfig.update({
-      label: label ? label.trim() : existingLayout.label,
-      type: currentType,
-      is_required: checkRequired,
-      length: finalLength,
-      options: processedOptions
-    }, { 
-      where: { config_code, key: key.trim() }, 
-      transaction: t 
-    });
-
-    await t.commit();
-
-    return res.status(200).json({
-      success: true,
-      message: "Form configuration element template updated successfully.",
-      config_code,
-      key
-    });
-  } catch (error) {
-    try {
-      await t.rollback();
-    } catch (rollbackErr) {
-    }
-    return next(error);
-  }
-};
-*/
 
 exports.deleteFieldFromLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const { config_code, key } = req.params;
+    const targetKey = key.trim();
 
     const existingLayout = await FormConfig.findOne({ 
       where: { 
         config_code, 
-        key: key.trim(),
-        is_delete: false 
+        key: targetKey
       }, 
       transaction: t 
     });
 
     if (!existingLayout) {
       await t.rollback();
-      return next(new AppError("The specified field configuration element was not found or has already been deleted.", 404));
+      return next(new AppError("The specified field configuration element was not found.", 404));
+    }
+
+    const currentOptions = existingLayout.options || {};
+    
+    if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
+      await t.rollback();
+      return next(new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403));
     }
 
     const currentClientId = existingLayout.client_id;
 
+    const updatedOptions = { ...currentOptions, is_deleted_field: true };
+
     await FormConfig.update(
-      { is_delete: true },
+      { options: updatedOptions },
       { 
-        where: { config_code, key: key.trim() }, 
+        where: { config_code, key: targetKey }, 
         transaction: t 
       }
     );
 
     await Form.update(
-      { custom_values: sequelize.literal("custom_values - '" + key.trim() + "'") },
+      { custom_values: sequelize.literal("custom_values - '" + targetKey + "'") },
       { where: { client_id: currentClientId }, transaction: t }
     );
 
@@ -380,7 +223,7 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: `Form field element key '${key.trim()}' was successfully soft-deleted and removed from historical submission payloads.`
+      message: `Form field element key '${targetKey}' was successfully soft-deleted and removed from historical submission payloads.`
     });
   } catch (error) {
     try {
@@ -390,3 +233,4 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     return next(error);
   }
 };
+
