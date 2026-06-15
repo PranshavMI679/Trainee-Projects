@@ -3,6 +3,18 @@ const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 const { v4: uuidv4 } = require('uuid');
 
+const isFieldDeleted = (fieldItem) => {
+  let opts = {};
+  if (fieldItem.options) {
+    if (typeof fieldItem.options === 'string') {
+      try { opts = JSON.parse(fieldItem.options); } catch (e) {}
+    } else if (typeof fieldItem.options === 'object') {
+      opts = fieldItem.options;
+    }
+  }
+  return opts.is_deleted_field === true || opts.is_deleted_field === 'true';
+};
+
 exports.getClientLayout = async (req, res, next) => {
   try {
     const { client_code } = req.params;
@@ -12,19 +24,23 @@ exports.getClientLayout = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const layouts = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
+    const allLayouts = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
 
-    const formattedFields = layouts.map(layout => {
-      return {
-        config_code: layout.config_code,
-        key: layout.key,
-        label: layout.label,
-        type: layout.type,
-        is_required: layout.is_required,
-        length: layout.length,
-        options: layout.options 
-      };
-    });
+    const formattedFields = [];
+    for (let i = 0; i < allLayouts.length; i++) {
+      const layout = allLayouts[i];
+      if (!isFieldDeleted(layout)) {
+        formattedFields.push({
+          config_code: layout.config_code,
+          key: layout.key,
+          label: layout.label,
+          type: layout.type,
+          is_required: layout.is_required,
+          length: layout.length,
+          options: layout.options 
+        });
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -80,8 +96,7 @@ exports.processConfigLayout = async (req, res, next) => {
           type: field.type.trim(),
           is_required: field.is_required === true || field.is_required === 'true',
           length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null),
-          options: processedOptions,
-          is_delete: false 
+          options: processedOptions
         };
       });
 
@@ -118,15 +133,24 @@ exports.processConfigLayout = async (req, res, next) => {
         }
 
         if (field.is_delete === true || field.is_delete === 'true') {
-          const currentOptions = existingLayout.options || {};
+          let currentOptions = {};
+          if (existingLayout.options) {
+            if (typeof existingLayout.options === 'string') {
+              try { currentOptions = JSON.parse(existingLayout.options); } catch (e) {}
+            } else {
+              currentOptions = existingLayout.options;
+            }
+          }
           
           if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
             await t.rollback();
             return next(new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403));
           }
 
+          const updatedOptions = { ...currentOptions, is_deleted_field: true };
+
           await FormConfig.update(
-            { is_delete: true },
+            { options: updatedOptions },
             { where: { config_code: identifier, key: targetKey }, transaction: t }
           );
 
@@ -139,7 +163,15 @@ exports.processConfigLayout = async (req, res, next) => {
 
         let currentType = field.type ? field.type.trim() : existingLayout.type;
         const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
-        let processedOptions = existingLayout.options || {};
+        
+        let processedOptions = {};
+        if (existingLayout.options) {
+          if (typeof existingLayout.options === 'string') {
+            try { processedOptions = JSON.parse(existingLayout.options); } catch (e) {}
+          } else {
+            processedOptions = existingLayout.options;
+          }
+        }
 
         if (field.options && typeof field.options === 'object') {
           processedOptions = {
@@ -195,7 +227,18 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
       return next(new AppError("The specified field configuration element was not found.", 404));
     }
 
-    const currentOptions = existingLayout.options || {};
+    let currentOptions = {};
+    if (existingLayout.options) {
+      if (typeof existingLayout.options === 'string') {
+        try { 
+          currentOptions = JSON.parse(existingLayout.options); 
+        } catch (e) {
+          currentOptions = {};
+        }
+      } else if (typeof existingLayout.options === 'object') {
+        currentOptions = existingLayout.options;
+      }
+    }
     
     if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
       await t.rollback();
@@ -233,4 +276,3 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     return next(error);
   }
 };
-

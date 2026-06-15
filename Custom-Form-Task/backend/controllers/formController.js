@@ -2,6 +2,18 @@ const { Form, FormConfig, Client } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 
+const isFieldDeleted = (fieldItem) => {
+  let opts = {};
+  if (fieldItem.options) {
+    if (typeof fieldItem.options === 'string') {
+      try { opts = JSON.parse(fieldItem.options); } catch (e) {}
+    } else if (typeof fieldItem.options === 'object') {
+      opts = fieldItem.options;
+    }
+  }
+  return opts.is_deleted_field === true || opts.is_deleted_field === 'true';
+};
+
 exports.getFormLayout = async (req, res, next) => {
   try {
     const { client_code } = req.params;
@@ -11,11 +23,18 @@ exports.getFormLayout = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
                                                                                                                                                                                                                                            
-    const fields = await FormConfig.findAll({
+    const allFields = await FormConfig.findAll({
       where: { client_id: targetClient.client_id }
     });
 
-    if (!fields || fields.length === 0) {
+    const fields = [];
+    for (let i = 0; i < allFields.length; i++) {
+      if (!isFieldDeleted(allFields[i])) {
+        fields.push(allFields[i]);
+      }
+    }
+
+    if (fields.length === 0) {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
@@ -66,8 +85,10 @@ exports.getAllDetails = async (req, res, next) => {
 
     const blueprintMap = {};
     allBlueprints.forEach(b => {
-      if (!blueprintMap[b.client_id]) blueprintMap[b.client_id] = [];
-      blueprintMap[b.client_id].push(b);
+      if (!isFieldDeleted(b)) {
+        if (!blueprintMap[b.client_id]) blueprintMap[b.client_id] = [];
+        blueprintMap[b.client_id].push(b);
+      }
     });
 
     const payload = entries.map(item => {
@@ -106,9 +127,16 @@ exports.getEmployeeDetails = async (req, res, next) => {
       return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
     }
 
-    const blueprints = await FormConfig.findAll({ 
+    const allBlueprints = await FormConfig.findAll({ 
       where: { client_id: emp.client_id } 
     });
+
+    const blueprints = [];
+    for (let i = 0; i < allBlueprints.length; i++) {
+      if (!isFieldDeleted(allBlueprints[i])) {
+        blueprints.push(allBlueprints[i]);
+      }
+    }
 
     const configMap = blueprints.map(b => ({
       config_code: b.config_code,
@@ -179,11 +207,8 @@ exports.processFormDetails = async (req, res, next) => {
     
     fieldsConfig = [];
     for (let i = 0; i < allFields.length; i++) {
-      const fieldItem = allFields[i];
-      const fieldOpts = fieldItem.options || {};
-      
-      if (fieldOpts.is_deleted_field !== true && fieldOpts.is_deleted_field !== 'true') {
-        fieldsConfig.push(fieldItem);
+      if (!isFieldDeleted(allFields[i])) {
+        fieldsConfig.push(allFields[i]);
       }
     }
     
@@ -226,12 +251,18 @@ exports.processFormDetails = async (req, res, next) => {
         finalValue = record.custom_values[field.key];
       }
 
+      let displayOptions = null;
+      if (field.options) {
+        let opts = typeof field.options === 'string' ? JSON.parse(field.options) : field.options;
+        displayOptions = Array.isArray(opts.value) ? opts.value : null;
+      }
+
       formattedConfig.push({
         config_code: field.config_code,
         label: field.label,
         key: field.key,
         type: field.type,
-        options: field.options,
+        options: displayOptions,
         value: finalValue
       });
     }

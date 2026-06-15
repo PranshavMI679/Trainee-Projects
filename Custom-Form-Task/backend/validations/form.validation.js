@@ -10,10 +10,9 @@ const formSchema = Joi.object({
     .trim()
     .min(2)
     .max(50)
-    .required()
+    .optional() 
     .messages({
       'string.empty': ErrorMessages.VALIDATION.NAME_EMPTY,
-      'any.required': ErrorMessages.VALIDATION.NAME_EMPTY,
       'string.max': ErrorMessages.VALIDATION.NAME_TOO_LONG
     }),
 
@@ -21,10 +20,9 @@ const formSchema = Joi.object({
     .trim()
     .regex(REGEX_PATTERNS.EMAIL_BASIC)
     .max(255)
-    .required()
+    .optional() 
     .messages({
       'string.empty': ErrorMessages.VALIDATION.EMAIL_REQUIRED,
-      'any.required': ErrorMessages.VALIDATION.EMAIL_REQUIRED,
       'string.pattern.base': ErrorMessages.VALIDATION.EMAIL_INVALID,
       'string.max': ErrorMessages.VALIDATION.EMAIL_TOO_LONG
     }),
