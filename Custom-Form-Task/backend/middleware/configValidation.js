@@ -30,7 +30,12 @@ const configValidation = async (req, res, next) => {
       const targetClient = await Client.findOne({ where: { client_code } });
       if (targetClient) {
         const layoutTemplates = await FormConfig.findAll({ 
-          where: { client_id: targetClient.client_id } 
+          where: { client_id: targetClient.client_id },
+          order: [
+            ['section_order', 'ASC'],
+            ['area_order', 'ASC'],
+            ['field_order', 'ASC']
+          ]
         });
         
         for (let i = 0; i < layoutTemplates.length; i++) {
@@ -62,7 +67,12 @@ const configValidation = async (req, res, next) => {
       const employeeRecord = await Form.findOne({ where: { employee_code } });
       if (employeeRecord) {
         const layoutTemplates = await FormConfig.findAll({ 
-          where: { client_id: employeeRecord.client_id } 
+          where: { client_id: employeeRecord.client_id },
+          order: [
+            ['section_order', 'ASC'],
+            ['area_order', 'ASC'],
+            ['field_order', 'ASC']
+          ]
         });
         
         for (let i = 0; i < layoutTemplates.length; i++) {
@@ -97,7 +107,14 @@ const configValidation = async (req, res, next) => {
     const rules = [];
     
     if (config_code) {
-      const allRules = await FormConfig.findAll({ where: { config_code } });
+      const allRules = await FormConfig.findAll({ 
+        where: { config_code },
+        order: [
+          ['section_order', 'ASC'],
+          ['area_order', 'ASC'],
+          ['field_order', 'ASC']
+        ]
+      });
 
       for (let i = 0; i < allRules.length; i++) {
         const currentRule = allRules[i];
