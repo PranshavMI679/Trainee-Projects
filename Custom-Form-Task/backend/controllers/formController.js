@@ -24,33 +24,60 @@ exports.getFormLayout = async (req, res, next) => {
     }
                                                                                                                                                                                                                                            
     const allFields = await FormConfig.findAll({
-      where: { client_id: targetClient.client_id }
+      where: { client_id: targetClient.client_id },
+      order: [
+        ['section_order', 'ASC'],
+        ['area_order', 'ASC'],
+        ['field_order', 'ASC']
+      ]
     });
 
-    const fields = [];
+    const sectionsMap = [];
+    let absoluteFieldCount = 0;
+
     for (let i = 0; i < allFields.length; i++) {
-      if (!isFieldDeleted(allFields[i])) {
-        fields.push(allFields[i]);
+      const layout = allFields[i];
+      
+      if (!isFieldDeleted(layout)) {
+        absoluteFieldCount++;
+
+        let section = sectionsMap.find(s => s.section_name === layout.section_name);
+        if (!section) {
+          section = {
+            section_name: layout.section_name,
+            section_order: layout.section_order || 1,
+            section_areas: []
+          };
+          sectionsMap.push(section);
+        }
+
+        let area = section.section_areas.find(a => a.area_name === layout.area_name);
+        if (!area) {
+          area = {
+            area_name: layout.area_name,
+            area_order: layout.area_order || 1,
+            fields: []
+          };
+          section.section_areas.push(area);
+        }
+
+        area.fields.push({
+          config_code: layout.config_code,
+          key: layout.key,
+          label: layout.label,
+          type: layout.type,
+          is_required: layout.is_required,
+          length: layout.length,
+          field_order: layout.field_order || 1,
+          options: layout.options,
+          value: null 
+        });
       }
     }
 
-    if (fields.length === 0) {
+    if (absoluteFieldCount === 0) {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
-
-    const dynamicCustomFields = {};
-    fields.forEach(f => {
-      dynamicCustomFields[f.key] = {
-        config_code: f.config_code,
-        key: f.key,
-        label: f.label,
-        type: f.type,
-        is_required: f.is_required,
-        length: f.length,
-        options: f.options, 
-        value: null
-      };
-    });
 
     return res.status(200).json({
       success: true,
@@ -60,7 +87,7 @@ exports.getFormLayout = async (req, res, next) => {
         employee_code: null,   
         name: "",               
         email: "",              
-        custom_values: dynamicCustomFields 
+        sections: sectionsMap 
       }
     });
   } catch (error) {
@@ -79,8 +106,14 @@ exports.getAllDetails = async (req, res, next) => {
     }
 
     const clientIds = [...new Set(entries.map(item => item.client_id))];
+    
     const allBlueprints = await FormConfig.findAll({
-      where: { client_id: clientIds }
+      where: { client_id: clientIds },
+      order: [
+        ['section_order', 'ASC'],
+        ['area_order', 'ASC'],
+        ['field_order', 'ASC']
+      ]
     });
 
     const blueprintMap = {};
@@ -99,6 +132,8 @@ exports.getAllDetails = async (req, res, next) => {
         label: b.label,
         key: b.key,
         type: b.type,
+        section_name: b.section_name,
+        area_name: b.area_name,
         options: b.options, 
         value: item.custom_values && item.custom_values[b.key] !== undefined ? item.custom_values[b.key] : null
       }));
@@ -128,7 +163,12 @@ exports.getEmployeeDetails = async (req, res, next) => {
     }
 
     const allBlueprints = await FormConfig.findAll({ 
-      where: { client_id: emp.client_id } 
+      where: { client_id: emp.client_id },
+      order: [
+        ['section_order', 'ASC'],
+        ['area_order', 'ASC'],
+        ['field_order', 'ASC']
+      ]
     });
 
     const blueprints = [];
@@ -143,6 +183,8 @@ exports.getEmployeeDetails = async (req, res, next) => {
       label: b.label,
       key: b.key,
       type: b.type,
+      section_name: b.section_name,
+      area_name: b.area_name,
       options: b.options,
       value: emp.custom_values && emp.custom_values[b.key] !== undefined ? emp.custom_values[b.key] : null
     }));
@@ -194,7 +236,9 @@ exports.processFormDetails = async (req, res, next) => {
           const key = inputKeys[i];
           const currentInput = custom_values[key];
 
-          if (currentInput === null || currentInput === undefined || (typeof currentInput === 'string' && currentInput.trim() === "")) {
+          if (currentInput === null || currentInput === undefined || 
+            (typeof currentInput === 'string' && currentInput.trim() === "")) 
+            {
             delete finalCustomValues[key];
           } else {
             finalCustomValues[key] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
@@ -203,7 +247,14 @@ exports.processFormDetails = async (req, res, next) => {
       }
     }
 
-    const allFields = await FormConfig.findAll({ where: { client_id: clientId } });
+    const allFields = await FormConfig.findAll({ 
+      where: { client_id: clientId },
+      order: [
+        ['section_order', 'ASC'],
+        ['area_order', 'ASC'],
+        ['field_order', 'ASC']
+      ]
+    });
     
     fieldsConfig = [];
     for (let i = 0; i < allFields.length; i++) {
@@ -262,6 +313,8 @@ exports.processFormDetails = async (req, res, next) => {
         label: field.label,
         key: field.key,
         type: field.type,
+        section_name: field.section_name,
+        area_name: field.area_name,
         options: displayOptions,
         value: finalValue
       });

@@ -1,3 +1,6 @@
+//router.post('/:client_code/fill-form', validator(formSchema), configValidation, enterDetails);
+//router.patch('/:employee_code/edit-details', validator(formSchema), configValidation, editFormDetails);
+
 exports.enterDetails = async (req, res, next) => {
   try {
     const { client_code } = req.params; 

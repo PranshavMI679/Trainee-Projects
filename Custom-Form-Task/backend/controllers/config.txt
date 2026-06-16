@@ -1,3 +1,6 @@
+//router.post('/:client_code/create', validator(configSchema), createFormLayout);
+//router.patch('/:config_code/edit-layout', validator(editFieldSchema), editConfiglayout);
+
 exports.createFormLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {

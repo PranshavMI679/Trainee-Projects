@@ -36,33 +36,7 @@ const FormConfig = sequelize.define('FormConfig', {
   options: {
     type: DataTypes.JSONB,
     allowNull: true,
-    defaultValue: null
-  },
-
-  section_name: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    defaultValue: 'General Information'
-  },
-  section_order: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1 
-  },
-  area_name: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    defaultValue: 'Main Group'
-  },
-  area_order: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1 
-  },
-  field_order: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1 
+    defaultValue: null,
   }
 }, {
   tableName: 'form_configs',
@@ -70,13 +44,7 @@ const FormConfig = sequelize.define('FormConfig', {
   createdAt: 'created_at',
   updatedAt: 'updated_at',
   indexes: [
-    { 
-      fields: ['config_code'] 
-    },
-    {
-      name: 'idx_form_configs_layout_sorting',
-      fields: ['client_id', 'config_code', 'section_order', 'area_order', 'field_order']
-    }
+    { fields: ['config_code'] }
   ]
 });
 

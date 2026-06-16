@@ -99,7 +99,13 @@ const singleFieldSchema = Joi.object({
         'any.required': 'Choice selectors Dropdown, Radio, and Checkbox require a populated options configurations object block containing a value list.'
       }),
       otherwise: Joi.object().optional()
-    })
+    }),
+
+  section_name: Joi.string().trim().max(100).optional(),
+  section_order: Joi.number().integer().min(1).optional(),
+  area_name: Joi.string().trim().max(100).optional(),
+  area_order: Joi.number().integer().min(1).optional(),
+  field_order: Joi.number().integer().min(1).optional()
 });
 
 const configSchema = Joi.object({
@@ -178,10 +184,44 @@ const editFieldSchema = Joi.object({
         value: Joi.array().items(Joi.string().trim().required()).min(1).required()
       }).required(),
       otherwise: Joi.object().optional()
-    })
+    }),
+
+  section_name: Joi.string().trim().max(100).optional(),
+  section_order: Joi.number().integer().min(1).optional(),
+  area_name: Joi.string().trim().max(100).optional(),
+  area_order: Joi.number().integer().min(1).optional(),
+  field_order: Joi.number().integer().min(1).optional()
 }).min(1);
+
+const structuralFieldSchema = Joi.object({
+  key: Joi.string()
+    .trim()
+    .regex(/^[a-z0-9_]+$/)
+    .required()
+    .messages({
+      'any.required': 'Field identifier key is required to alter positions.',
+      'string.pattern.base': 'Field identifier key must be lowercase alphanumeric with underscores.'
+    }),
+  section_name: Joi.string().trim().max(100).required(),
+  section_order: Joi.number().integer().min(1).required(), 
+  area_name: Joi.string().trim().max(100).required(),
+  area_order: Joi.number().integer().min(1).required(), 
+  field_order: Joi.number().integer().min(1).required()    
+});
+
+const layoutReorderSchema = Joi.object({
+  fields: Joi.array()
+    .items(structuralFieldSchema)
+    .min(1)
+    .required()
+    .messages({
+      'array.base': 'Reordering data payload must be passed within an array list block.',
+      'array.min': 'Provide at least one component coordinate set to execute changes.'
+    })
+});
 
 module.exports = { 
   configSchema,
-  editFieldSchema
+  editFieldSchema,
+  layoutReorderSchema 
 };

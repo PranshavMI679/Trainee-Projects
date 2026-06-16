@@ -11,7 +11,5 @@ router.get('/:client_code/layout', getFormLayout);
 router.get('/:employee_code/details', getEmployeeDetails);
 
 router.post('/:code/process', validator(formSchema), configValidation, processFormDetails);
-//router.post('/:client_code/fill-form', validator(formSchema), configValidation, enterDetails);
-//router.patch('/:employee_code/edit-details', validator(formSchema), configValidation, editFormDetails);
 
 module.exports = router;

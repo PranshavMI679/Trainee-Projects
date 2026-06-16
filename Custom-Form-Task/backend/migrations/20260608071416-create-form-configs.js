@@ -16,7 +16,10 @@ module.exports = {
       client_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        
+        references: {
+          model: 'clients',
+          key: 'client_id'
+        },
         onDelete: 'CASCADE',
         onUpdate: 'CASCADE'
       },
@@ -42,6 +45,31 @@ module.exports = {
         allowNull: true,
         defaultValue: null
       },
+      section_name: {
+        type: Sequelize.STRING(100),
+        allowNull: false,
+        defaultValue: 'General Information'
+      },
+      section_order: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 1 
+      },
+      area_name: {
+        type: Sequelize.STRING(100),
+        allowNull: false,
+        defaultValue: 'Main Group'
+      },
+      area_order: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 1 
+      },
+      field_order: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 1 
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -57,9 +85,15 @@ module.exports = {
     await queryInterface.addIndex('form_configs', ['config_code'], {
       name: 'idx_form_configs_config_code'
     });
+
+    await queryInterface.addIndex('form_configs', ['client_id', 'config_code', 'section_order', 'area_order', 'field_order'], {
+      name: 'idx_form_configs_layout_sorting'
+    });
   },
 
   async down(queryInterface, Sequelize) {
+    await queryInterface.removeIndex('form_configs', 'idx_form_configs_layout_sorting');
+    await queryInterface.removeIndex('form_configs', 'idx_form_configs_config_code');
     await queryInterface.dropTable('form_configs');
   }
 };

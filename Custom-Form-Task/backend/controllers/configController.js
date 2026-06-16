@@ -24,19 +24,49 @@ exports.getClientLayout = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const allLayouts = await FormConfig.findAll({ where: { client_id: targetClient.client_id } });
+    const allLayouts = await FormConfig.findAll({ 
+      where: { client_id: targetClient.client_id },
+      order: [
+        ['section_order', 'ASC'],
+        ['area_order', 'ASC'],
+        ['field_order', 'ASC']
+      ]
+    });
 
-    const formattedFields = [];
+    const sectionsMap = [];
+
     for (let i = 0; i < allLayouts.length; i++) {
       const layout = allLayouts[i];
+      
       if (!isFieldDeleted(layout)) {
-        formattedFields.push({
+        let section = sectionsMap.find(s => s.section_name === layout.section_name);
+        if (!section) {
+          section = {
+            section_name: layout.section_name,
+            section_order: layout.section_order || 1,
+            section_areas: []
+          };
+          sectionsMap.push(section);
+        }
+
+        let area = section.section_areas.find(a => a.area_name === layout.area_name);
+        if (!area) {
+          area = {
+            area_name: layout.area_name,
+            area_order: layout.area_order || 1,
+            fields: []
+          };
+          section.section_areas.push(area);
+        }
+
+        area.fields.push({
           config_code: layout.config_code,
           key: layout.key,
           label: layout.label,
           type: layout.type,
           is_required: layout.is_required,
           length: layout.length,
+          field_order: layout.field_order || 1,
           options: layout.options 
         });
       }
@@ -47,8 +77,8 @@ exports.getClientLayout = async (req, res, next) => {
       client_id: targetClient.client_id,
       client_code: targetClient.client_code,
       client_name: targetClient.client_name,
-      fields_count: formattedFields.length,
-      fields: formattedFields
+      sections_count: sectionsMap.length,
+      sections: sectionsMap
     });
   } catch (error) {
     return next(error);
@@ -96,7 +126,12 @@ exports.processConfigLayout = async (req, res, next) => {
           type: field.type.trim(),
           is_required: field.is_required === true || field.is_required === 'true',
           length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null),
-          options: processedOptions
+          options: processedOptions,
+          section_name: field.section_name ? field.section_name.trim() : 'General Information',
+          section_order: parseInt(field.section_order) || 1,
+          area_name: field.area_name ? field.area_name.trim() : 'Main Group',
+          area_order: parseInt(field.area_order) || 1,
+          field_order: parseInt(field.field_order) || 1
         };
       });
 
@@ -188,7 +223,12 @@ exports.processConfigLayout = async (req, res, next) => {
           type: currentType,
           is_required: field.is_required !== undefined ? (field.is_required === true || field.is_required === 'true') : existingLayout.is_required,
           length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || existingLayout.length),
-          options: processedOptions
+          options: processedOptions,
+          section_name: field.section_name ? field.section_name.trim() : existingLayout.section_name,
+          section_order: field.section_order !== undefined ? parseInt(field.section_order) : existingLayout.section_order,
+          area_name: field.area_name ? field.area_name.trim() : existingLayout.area_name,
+          area_order: field.area_order !== undefined ? parseInt(field.area_order) : existingLayout.area_order,
+          field_order: field.field_order !== undefined ? parseInt(field.field_order) : existingLayout.field_order
         }, { 
           where: { config_code: identifier, key: targetKey }, 
           transaction: t 
@@ -202,6 +242,42 @@ exports.processConfigLayout = async (req, res, next) => {
         config_code: identifier
       });
     }
+  } catch (error) {
+    try { await t.rollback(); } catch (e) {}
+    return next(error);
+  }
+};
+
+exports.updateFormLayoutStructure = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { client_id, config_code } = req.params;
+    const { fields } = req.body; 
+
+    await Promise.all(fields.map(field => {
+      return FormConfig.update({
+        section_name: field.section_name.trim(),
+        section_order: parseInt(field.section_order),
+        area_name: field.area_name.trim(),
+        area_order: parseInt(field.area_order),
+        field_order: parseInt(field.field_order)
+      }, {
+        where: {
+          client_id,
+          config_code,
+          key: field.key.trim()
+        },
+        transaction: t
+      });
+    }));
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Form structural layout transformations and sorting order parameters applied successfully."
+    });
+
   } catch (error) {
     try { await t.rollback(); } catch (e) {}
     return next(error);
@@ -246,7 +322,6 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     }
 
     const currentClientId = existingLayout.client_id;
-
     const updatedOptions = { ...currentOptions, is_deleted_field: true };
 
     await FormConfig.update(
@@ -271,8 +346,7 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
   } catch (error) {
     try {
       await t.rollback();
-    } catch (rollbackErr) {
-    }
+    } catch (rollbackErr) {}
     return next(error);
   }
 };
