@@ -199,14 +199,13 @@ const structuralFieldSchema = Joi.object({
     .regex(/^[a-z0-9_]+$/)
     .required()
     .messages({
-      'any.required': 'Field identifier key is required to alter positions.',
-      'string.pattern.base': 'Field identifier key must be lowercase alphanumeric with underscores.'
+      'any.required': 'Field identifier key is required to alter positions.'
     }),
-  section_name: Joi.string().trim().max(100).required(),
-  section_order: Joi.number().integer().min(1).required(), 
-  area_name: Joi.string().trim().max(100).required(),
-  area_order: Joi.number().integer().min(1).required(), 
-  field_order: Joi.number().integer().min(1).required()    
+  section_name: Joi.string().trim().max(100).optional(),
+  section_order: Joi.number().integer().min(1).optional(), 
+  area_name: Joi.string().trim().max(100).optional(),
+  area_order: Joi.number().integer().min(1).optional(), 
+  field_order: Joi.number().integer().min(1).optional()    
 });
 
 const layoutReorderSchema = Joi.object({

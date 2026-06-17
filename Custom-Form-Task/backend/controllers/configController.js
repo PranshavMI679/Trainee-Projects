@@ -251,25 +251,52 @@ exports.processConfigLayout = async (req, res, next) => {
 exports.updateFormLayoutStructure = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { client_id, config_code } = req.params;
+    const { config_code } = req.params;
     const { fields } = req.body; 
 
-    await Promise.all(fields.map(field => {
-      return FormConfig.update({
-        section_name: field.section_name.trim(),
-        section_order: parseInt(field.section_order),
-        area_name: field.area_name.trim(),
-        area_order: parseInt(field.area_order),
-        field_order: parseInt(field.field_order)
-      }, {
-        where: {
-          client_id,
-          config_code,
-          key: field.key.trim()
-        },
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      await t.rollback();
+      return next(new AppError("Reordering payload data must contain a valid, non-empty array list of fields.", 400));
+    }
+
+    // SAFE NATIVE LOOP FOR COMPOSITE PRIMARY KEYS & PARTIAL PATCHES
+    for (const field of fields) {
+      const targetKey = field.key ? String(field.key).trim() : '';
+      if (!targetKey) continue;
+
+      // 1. Fetch the row's current state first to ensure true partial patching (no blind string overwrites)
+      const existingRow = await FormConfig.findOne({
+        where: { config_code, key: targetKey },
         transaction: t
       });
-    }));
+
+      if (!existingRow) {
+        await t.rollback();
+        return next(new AppError(`Target layout field not found for key: '${targetKey}'`, 404));
+      }
+
+      // 2. Safe Fallbacks: Use payload properties if provided, otherwise preserve existing database values
+      const finalSectionName = field.section_name !== undefined ? String(field.section_name).trim() : existingRow.section_name;
+      const finalAreaName = field.area_name !== undefined ? String(field.area_name).trim() : existingRow.area_name;
+      
+      const finalSectionOrder = field.section_order !== undefined ? parseInt(field.section_order) : existingRow.section_order;
+      const finalAreaOrder = field.area_order !== undefined ? parseInt(field.area_order) : existingRow.area_order;
+      const finalFieldOrder = field.field_order !== undefined ? parseInt(field.field_order) : existingRow.field_order;
+
+      // 3. Execute the row-level update query cleanly
+      await FormConfig.update({
+        section_name: finalSectionName,
+        section_order: finalSectionOrder,
+        area_name: finalAreaName,
+        area_order: finalAreaOrder,
+        field_order: finalFieldOrder
+      }, {
+        where: { config_code, key: targetKey },
+        transaction: t,
+        hooks: false,             // Bypasses model triggers
+        individualHooks: false    // Prevents connection hangs
+      });
+    }
 
     await t.commit();
 
@@ -279,7 +306,7 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
     });
 
   } catch (error) {
-    try { await t.rollback(); } catch (e) {}
+    try { await t.rollback(); } catch (err) {}
     return next(error);
   }
 };
