@@ -3,6 +3,10 @@ const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 const { v4: uuidv4 } = require('uuid');
 
+const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
+const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
+const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
+
 const isFieldDeleted = (fieldItem) => {
   let opts = {};
   if (fieldItem.options) {
@@ -85,6 +89,42 @@ exports.getClientLayout = async (req, res, next) => {
   }
 };
 
+exports.processConfigLayout = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { identifier } = req.params; 
+    const { target_type, fields } = req.body;
+
+    let result;
+
+    if (target_type === 'SECTION' || target_type === 'AREA') {
+      result = await handleBulkDelete(identifier, req.body, t);
+    } 
+    else {
+      const targetClient = await Client.findOne({ where: { client_code: identifier }, transaction: t });
+
+      if (targetClient) {
+        result = await handleBulkCreate(targetClient, fields, t);
+      } else {
+        result = await handleFieldUpdates(identifier, req.body, t);
+      }
+    }
+
+    await t.commit();
+    return res.status(result.status || 200).json({
+      success: true,
+      message: result.message,
+      config_code: result.config_code || identifier
+    });
+
+  } catch (error) {
+    try { await t.rollback(); } catch (e) {}
+    return next(error);
+  }
+};
+
+
+/*
 exports.processConfigLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
@@ -247,6 +287,7 @@ exports.processConfigLayout = async (req, res, next) => {
     return next(error);
   }
 };
+*/
 
 exports.updateFormLayoutStructure = async (req, res, next) => {
   const t = await sequelize.transaction();
