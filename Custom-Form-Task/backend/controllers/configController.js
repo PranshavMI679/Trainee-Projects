@@ -259,12 +259,10 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
       return next(new AppError("Reordering payload data must contain a valid, non-empty array list of fields.", 400));
     }
 
-    // SAFE NATIVE LOOP FOR COMPOSITE PRIMARY KEYS & PARTIAL PATCHES
     for (const field of fields) {
       const targetKey = field.key ? String(field.key).trim() : '';
       if (!targetKey) continue;
 
-      // 1. Fetch the row's current state first to ensure true partial patching (no blind string overwrites)
       const existingRow = await FormConfig.findOne({
         where: { config_code, key: targetKey },
         transaction: t
@@ -275,7 +273,6 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
         return next(new AppError(`Target layout field not found for key: '${targetKey}'`, 404));
       }
 
-      // 2. Safe Fallbacks: Use payload properties if provided, otherwise preserve existing database values
       const finalSectionName = field.section_name !== undefined ? String(field.section_name).trim() : existingRow.section_name;
       const finalAreaName = field.area_name !== undefined ? String(field.area_name).trim() : existingRow.area_name;
       
@@ -283,7 +280,6 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
       const finalAreaOrder = field.area_order !== undefined ? parseInt(field.area_order) : existingRow.area_order;
       const finalFieldOrder = field.field_order !== undefined ? parseInt(field.field_order) : existingRow.field_order;
 
-      // 3. Execute the row-level update query cleanly
       await FormConfig.update({
         section_name: finalSectionName,
         section_order: finalSectionOrder,
@@ -293,8 +289,8 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
       }, {
         where: { config_code, key: targetKey },
         transaction: t,
-        hooks: false,             // Bypasses model triggers
-        individualHooks: false    // Prevents connection hangs
+        hooks: false,             
+        individualHooks: false    
       });
     }
 
