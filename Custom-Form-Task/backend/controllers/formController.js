@@ -3,15 +3,26 @@ const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 
 const isFieldDeleted = (fieldItem) => {
-  let opts = {};
-  if (fieldItem.options) {
-    if (typeof fieldItem.options === 'string') {
-      try { opts = JSON.parse(fieldItem.options); } catch (e) {}
-    } else if (typeof fieldItem.options === 'object') {
-      opts = fieldItem.options;
+  if (!fieldItem || !fieldItem.options) return false;
+  let opts = fieldItem.options;
+  
+  while (typeof opts === 'string') {
+    try {
+      const parsed = JSON.parse(opts);
+      if (parsed && typeof parsed === 'object') {
+        opts = parsed;
+      } else {
+        break;
+      }
+    } catch (e) {
+      break;
     }
   }
-  return opts.is_deleted_field === true || opts.is_deleted_field === 'true';
+  if (!opts || typeof opts !== 'object') return false;
+  return opts.is_deleted_field === true || 
+         opts.is_deleted_field === 'true' ||
+         opts.is_delete === true ||
+         opts.is_delete === 'true';
 };
 
 exports.getFormLayout = async (req, res, next) => {
@@ -77,6 +88,22 @@ exports.getFormLayout = async (req, res, next) => {
 
     if (absoluteFieldCount === 0) {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+    }
+
+    sectionsMap.sort((a, b) => {
+      if (a.section_order !== b.section_order) {
+        return a.section_order - b.section_order;
+      }
+      return a.section_name.localeCompare(b.section_name);
+    });
+
+    for (let i = 0; i < sectionsMap.length; i++) {
+      sectionsMap[i].section_areas.sort((a, b) => {
+        if (a.area_order !== b.area_order) {
+          return a.area_order - b.area_order;
+        }
+        return a.area_name.localeCompare(b.area_name);
+      });
     }
 
     return res.status(200).json({
@@ -304,8 +331,14 @@ exports.processFormDetails = async (req, res, next) => {
 
       let displayOptions = null;
       if (field.options) {
-        let opts = typeof field.options === 'string' ? JSON.parse(field.options) : field.options;
-        displayOptions = Array.isArray(opts.value) ? opts.value : null;
+        try {
+          let opts = typeof field.options === 'string' ? JSON.parse(field.options) : field.options;
+          if (opts && opts.value) {
+            displayOptions = Array.isArray(opts.value) ? opts.value : null;
+          }
+        } catch (e) {
+          displayOptions = null;
+        }
       }
 
       formattedConfig.push({
@@ -314,11 +347,26 @@ exports.processFormDetails = async (req, res, next) => {
         key: field.key,
         type: field.type,
         section_name: field.section_name,
+        section_order: field.section_order || 1,
         area_name: field.area_name,
+        area_order: field.area_order || 1,
         options: displayOptions,
         value: finalValue
       });
     }
+
+    formattedConfig.sort((a, b) => {
+      if (a.section_order !== b.section_order) {
+        return a.section_order - b.section_order;
+      }
+      const secComp = a.section_name.localeCompare(b.section_name);
+      if (secComp !== 0) return secComp;
+
+      if (a.area_order !== b.area_order) {
+        return a.area_order - b.area_order;
+      }
+      return a.area_name.localeCompare(b.area_name);
+    });
 
     return res.status(isNewSubmission ? 201 : 200).json({
       success: true,
@@ -334,3 +382,4 @@ exports.processFormDetails = async (req, res, next) => {
     return next(error);
   }
 };
+

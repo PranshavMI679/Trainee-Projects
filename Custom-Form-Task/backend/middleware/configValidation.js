@@ -247,13 +247,14 @@ const configValidation = async (req, res, next) => {
       for (let j = 0; j < error.details.length; j++) {
         errorMessagesArray.push(error.details[j].message);
       }
-      return next(new AppError(errorMessagesArray.join(' '), 400));
+      const completeErrorMessage = errorMessagesArray.join(' ');
+      return next(new AppError(completeErrorMessage, 400));
     }
 
     req.body.custom_values = value;
-    next();
+    return next();
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 

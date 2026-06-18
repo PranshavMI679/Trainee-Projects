@@ -21,6 +21,7 @@ module.exports = async (targetClient, fields, t) => {
     const processedOptions = {
       is_multiple: field.options ? (field.options.is_multiple === true || field.options.is_multiple === 'true') : false,
       can_delete: targetCanDelete,
+      is_deleted_field: false,
       value: field.options && Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : [],
       thousand_separator: field.options && field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
       decimal_separator: field.options && field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
