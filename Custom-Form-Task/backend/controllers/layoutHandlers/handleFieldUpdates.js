@@ -1,9 +1,6 @@
 const { FormConfig, Form, DeleteHistory, sequelize } = require('../../models');
 const AppError = require('../../utils/appError');
 
-/**
- * Safe integer parser helper to shield database insertions from NaN payloads.
- */
 const safeInt = (value, fallbackValue) => {
   if (value === undefined || value === null) return fallbackValue;
   const parsed = parseInt(value, 10);
@@ -13,7 +10,6 @@ const safeInt = (value, fallbackValue) => {
 module.exports = async (identifier, reqBody, t) => {
   let fields = reqBody.fields;
   
-  // 1. Normalize payload inputs to guarantee a consistent loop iteration structure
   if (!fields || !Array.isArray(fields)) {
     if (!reqBody.key) throw new AppError("Field identifier 'key' parameter is required.", 400);
     fields = [{ 
@@ -36,7 +32,6 @@ module.exports = async (identifier, reqBody, t) => {
   const keysToPurge = [];
   let clientWorkspaceId = null;
 
-  // 2. Iterate through incoming fields configuration updates map
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i];
     const targetKey = field.key ? String(field.key).trim() : '';
@@ -50,7 +45,6 @@ module.exports = async (identifier, reqBody, t) => {
 
     clientWorkspaceId = existingLayout.client_id;
 
-    // Direct object lookup from native JSONB column profile; fallback gracefully if relics exist
     let currentOptions = {};
     if (existingLayout.options) {
       if (typeof existingLayout.options === 'string') {
@@ -60,13 +54,11 @@ module.exports = async (identifier, reqBody, t) => {
       }
     }
 
-    // --- CASE 1: CORE FIELD DELETION INTERCEPT ROUTINE ---
     if (field.is_delete === true || field.is_delete === 'true') {
       if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
         throw new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403);
       }
 
-      // Track deletion records inside batch payload container array
       historyPayloads.push({
         config_code: identifier,
         client_id: existingLayout.client_id,
@@ -94,7 +86,6 @@ module.exports = async (identifier, reqBody, t) => {
       continue; 
     }
 
-    // --- CASE 2: FIELD SPECIFICATION UPDATE / REVIVAL ROUTINE ---
     let currentType = field.type ? String(field.type).trim() : existingLayout.type;
     const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -103,7 +94,6 @@ module.exports = async (identifier, reqBody, t) => {
       currentOptions.is_deleted_field = false;
     }
 
-    // Safely structure and deep-merge component values into the options schema mapping profile
     if (field.options && typeof field.options === 'object') {
       currentOptions = {
         is_multiple: field.options.is_multiple !== undefined 
@@ -141,19 +131,16 @@ module.exports = async (identifier, reqBody, t) => {
     }, { where: { config_code: identifier, key: targetKey }, transaction: t });
   }
 
-  // --- POST-LOOP SECURE BATCH PURGE ENGINE ---
   if (keysToPurge.length > 0 && clientWorkspaceId) {
-    // 1. Commit deletion histories inside a single optimized write statement
     await DeleteHistory.bulkCreate(historyPayloads, { transaction: t });
 
-    // 2. Perform safe, high-performance PostgreSQL JSONB keys removal
     await Form.update(
       { 
         custom_values: sequelize.literal(`custom_values - CAST(ARRAY[:keysToPurge] AS text[])`) 
       },
       { 
         where: { client_id: clientWorkspaceId }, 
-        replacements: { keysToPurge }, // Defends application entirely from SQL injections
+        replacements: { keysToPurge }, 
         transaction: t 
       }
     );
