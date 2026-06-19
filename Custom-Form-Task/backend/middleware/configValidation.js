@@ -5,234 +5,207 @@ const AppError = require('../utils/appError');
 const REGEX_PATTERNS = {
   URL: /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/,
   EMAIL_BASIC: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
-  EXACT_DATE: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|\d|3)$/,
-  EXACT_DATETIME: /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|\d|3) (0\d|1\d|2[0-4]):[0-5]\d:[0-5]\d$/
+  EXACT_DATE: /^\d{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[0-1])$/,
+  EXACT_DATETIME: /^\d{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[0-1]) (0[0-9]|1[0-9]|2[0-3]):[0-5]\d:[0-5]\d$/
 };
 
 const configValidation = async (req, res, next) => {
   try {
     const { code } = req.params; 
-    let { config_code, client_code } = req.params; 
-    let { employee_code } = req.params;
+    let lookupIdentifier = code ? String(code).trim() : null;
     const { custom_values } = req.body;
 
-    if (code) {
-      if (code.includes('-') && code.length > 20) {
-        config_code = code;
-      } else if (code.toUpperCase().startsWith('EMP')) {
-        employee_code = code;
-      } else {
-        client_code = code;
-      }
+    if (!lookupIdentifier) {
+      return next(new AppError("A validation tracking identifier path parameter is strictly required.", 400));
     }
 
-    if (!config_code && client_code) {
-      const targetClient = await Client.findOne({ where: { client_code } });
-      if (targetClient) {
-        const layoutTemplates = await FormConfig.findAll({ 
-          where: { client_id: targetClient.client_id },
-          order: [
-            ['section_order', 'ASC'],
-            ['area_order', 'ASC'],
-            ['field_order', 'ASC']
-          ]
-        });
-        
-        for (let i = 0; i < layoutTemplates.length; i++) {
-          const item = layoutTemplates[i];
-          let opts = {};
+    let allRules = [];
 
-          if (item.options) {
-            if (typeof item.options === 'string') {
-              try { opts = JSON.parse(item.options); } catch (e) {}
-            } else if (typeof item.options === 'object') {
-              opts = item.options;
-            }
-          }
-
-          const isDeleted = opts.is_deleted_field === true || 
-                            opts.is_deleted_field === 'true' ||
-                            opts.is_delete === true || 
-                            opts.is_delete === 'true';
-
-          if (!isDeleted) {
-            config_code = item.config_code;
-            break; 
-          }
-        }
-      }
-    }
-
-    if (!config_code && employee_code) {
-      const employeeRecord = await Form.findOne({ where: { employee_code } });
+    if (lookupIdentifier.toUpperCase().startsWith('EMP')) {
+      const employeeRecord = await Form.findOne({ where: { employee_code: lookupIdentifier.toUpperCase() } });
       if (employeeRecord) {
-        const layoutTemplates = await FormConfig.findAll({ 
+        allRules = await FormConfig.findAll({ 
           where: { client_id: employeeRecord.client_id },
           order: [
+            ['created_at', 'DESC'],
             ['section_order', 'ASC'],
             ['area_order', 'ASC'],
             ['field_order', 'ASC']
           ]
         });
-        
-        for (let i = 0; i < layoutTemplates.length; i++) {
-          const item = layoutTemplates[i];
-          let opts = {};
+      }
+    } else {
+      const targetClient = await Client.findOne({ where: { client_code: lookupIdentifier } });
 
-          if (item.options) {
-            if (typeof item.options === 'string') {
-              try { opts = JSON.parse(item.options); } catch (e) {}
-            } else if (typeof item.options === 'object') {
-              opts = item.options;
-            }
-          }
-
-          const isDeleted = opts.is_deleted_field === true || 
-                            opts.is_deleted_field === 'true' ||
-                            opts.is_delete === true || 
-                            opts.is_delete === 'true';
-
-          if (!isDeleted) {
-            config_code = item.config_code;
-            break; 
-          }
-        }
+      if (targetClient) {
+        allRules = await FormConfig.findAll({ 
+          where: { client_id: targetClient.client_id },
+          order: [
+            ['created_at', 'DESC'],
+            ['section_order', 'ASC'],
+            ['area_order', 'ASC'],
+            ['field_order', 'ASC']
+          ]
+        });
+      } else {
+        allRules = await FormConfig.findAll({ 
+          where: { config_code: lookupIdentifier },
+          order: [
+            ['created_at', 'DESC'],
+            ['section_order', 'ASC'],
+            ['area_order', 'ASC'],
+            ['field_order', 'ASC']
+          ]
+        });
       }
     }
 
-    if (!config_code && req.body.config_code) {
-      config_code = req.body.config_code;
-    }
-
-    const rules = [];
-    
-    if (config_code) {
-      const allRules = await FormConfig.findAll({ 
-        where: { config_code },
+    if (allRules.length === 0 && req.body.config_code) {
+      allRules = await FormConfig.findAll({ 
+        where: { config_code: String(req.body.config_code).trim() },
         order: [
+          ['created_at', 'DESC'],
           ['section_order', 'ASC'],
           ['area_order', 'ASC'],
           ['field_order', 'ASC']
-        ]
+          ]
       });
+    }
 
-      for (let i = 0; i < allRules.length; i++) {
-        const currentRule = allRules[i];
-        let currentOpts = {};
+    const rules = [];
+    const observedKeys = new Set();
 
-        if (currentRule.options) {
-          if (typeof currentRule.options === 'string') {
-            try {
-              currentOpts = JSON.parse(currentRule.options);
-            } catch (e) {
-              currentOpts = {};
-            }
-          } else if (typeof currentRule.options === 'object') {
-            currentOpts = currentRule.options;
-          }
-        }
-        
-        const isDeletedField = currentOpts.is_deleted_field === true || 
-                               currentOpts.is_deleted_field === 'true' ||
-                               currentOpts.is_delete === true || 
-                               currentOpts.is_delete === 'true';
+    for (let i = 0; i < allRules.length; i++) {
+      const currentRule = allRules[i];
+      if (!currentRule.key || observedKeys.has(currentRule.key)) continue;
 
-        if (!isDeletedField) {
-          rules.push(currentRule);
-        }
+      const opts = currentRule.options || {};
+      
+      const isDeletedField = opts.is_deleted_field === true || 
+                             opts.is_deleted_field === 'true' ||
+                             opts.is_delete === true || 
+                             opts.is_delete === 'true';
+
+      if (!isDeletedField) {
+        observedKeys.add(currentRule.key);
+        rules.push(currentRule);
       }
+    }
+
+    if (rules.length === 0) {
+      return next(new AppError("Validation configuration block could not be resolved. Ensure the client code or layout config UUID is active and registered in your database.", 400));
     }
 
     const dynamicJoiRules = {};
 
-    if (rules.length === 0 && custom_values && typeof custom_values === 'object') {
-      const incomingKeys = Object.keys(custom_values);
-      for (let k = 0; k < incomingKeys.length; k++) {
-        dynamicJoiRules[incomingKeys[k]] = Joi.any().optional().allow('', null);
-      }
-    } else {
-      for (let i = 0; i < rules.length; i++) {
-        const rule = rules[i];
-        let joiFieldSchema;
-        const normalizedType = rule.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (let i = 0; i < rules.length; i++) {
+      const rule = rules[i];
+      let joiFieldSchema;
+      const normalizedType = rule.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const parsedOptions = rule.options || {};
 
-        let parsedOptions = {};
-        if (rule.options) {
-          if (typeof rule.options === 'string') {
-            try { parsedOptions = JSON.parse(rule.options); } catch (e) {}
-          } else if (typeof rule.options === 'object') {
-            parsedOptions = rule.options;
-          }
-        }
-
-        switch (normalizedType) {
-          case 'singleline':
-          case 'textbox': 
-          case 'multiline':
-          case 'currency': 
-          case 'phone':    
-            joiFieldSchema = Joi.string().trim();
-            if (rule.length) {
-              joiFieldSchema = joiFieldSchema.max(rule.length).messages({
-                'string.max': `Custom field '${rule.label}' exceeds maximum permitted length of ${rule.length} characters.`
-              });
-            }
-            break;
-
-          case 'email':
-            joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EMAIL_BASIC).messages({
-              'string.pattern.base': `Custom field '${rule.label}' must be a valid email structure.`
+      switch (normalizedType) {
+        case 'singleline':
+        case 'textbox': 
+        case 'multiline':
+        case 'currency': 
+        case 'phone':    
+          joiFieldSchema = Joi.string().trim();
+          if (rule.length) {
+            joiFieldSchema = joiFieldSchema.max(rule.length).messages({
+              'string.max': `Custom field '${rule.label}' exceeds maximum permitted length of ${rule.length} characters.`
             });
-            break;
+          }
+          break;
 
-          case 'dropdown':
-          case 'radio':
-          case 'radioselection':
-          case 'checkbox':
-            const allowedList = parsedOptions.value || [];
-            if (parsedOptions.is_multiple === true || parsedOptions.is_multiple === 'true') {
-              joiFieldSchema = Joi.array().items(Joi.string().trim().valid(...allowedList)).min(1);
-            } else {
-              joiFieldSchema = Joi.string().trim().valid(...allowedList);
-            }
-            break;
+        case 'email':
+          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EMAIL_BASIC).messages({
+            'string.pattern.base': `Custom field '${rule.label}' must be a valid email structure.`
+          });
+          break;
 
-          case 'date':
-            joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EXACT_DATE);
-            break;
+        case 'dropdown':
+        case 'radio':
+        case 'radioselection':
+        case 'checkbox': {
+          let allowedList = [];
+          if (Array.isArray(parsedOptions)) {
+            allowedList = parsedOptions.map(o => String(o).trim());
+          } else if (parsedOptions && Array.isArray(parsedOptions.value)) {
+            allowedList = parsedOptions.value.map(o => String(o).trim());
+          }
 
-          case 'datetime':
-            joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EXACT_DATETIME);
-            break;
-
-          case 'number':
-          case 'decimal':
-          case 'percent':
-            joiFieldSchema = Joi.number().min(0);
-            break;
-
-          case 'url':
-            joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.URL);
-            break;
-
-          default:
-            joiFieldSchema = Joi.any();
-            break;
-        }
-
-        if (normalizedType !== 'fileupload' && normalizedType !== 'file') {
-          if (rule.is_required) {
-            joiFieldSchema = joiFieldSchema.required().messages({
-              'any.required': `The dynamic field '${rule.label}' is marked mandatory.`,
-              'string.empty': `The dynamic field '${rule.label}' cannot be left empty.`
+          if (allowedList.length === 0) {
+            joiFieldSchema = Joi.any().forbidden().messages({
+              'any.unknown': `Configuration error: Custom field '${rule.label}' has no valid choices configured.`
             });
           } else {
-            joiFieldSchema = joiFieldSchema.optional().allow('', null);
+            const isMultipleMode = parsedOptions.is_multiple === true || parsedOptions.is_multiple === 'true';
+            
+            if (isMultipleMode) {
+              joiFieldSchema = Joi.array().items(
+                Joi.string().trim().valid(...allowedList).messages({
+                  'any.only': `Selected option inside '${rule.label}' must match one of: [${allowedList.join(', ')}].`
+                })
+              ).min(1).messages({
+                'array.min': `You must select at least one choice for '${rule.label}'.`
+              });
+            } else {
+              joiFieldSchema = Joi.string().trim().valid(...allowedList).messages({
+                'any.only': `Custom field '${rule.label}' must match one of your updated choices: [${allowedList.join(', ')}].`
+              });
+            }
           }
+          break;
         }
 
-        dynamicJoiRules[rule.key] = joiFieldSchema;
+        case 'date':
+          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EXACT_DATE).messages({
+            'string.pattern.base': `Custom field '${rule.label}' must be a valid date in YYYY-MM-DD format.`
+          });
+          break;
+
+        case 'datetime':
+          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.EXACT_DATETIME).messages({
+            'string.pattern.base': `Custom field '${rule.label}' must match format YYYY-MM-DD HH:mm:ss.`
+          });
+          break;
+
+        case 'number':
+        case 'decimal':
+        case 'percent':
+          joiFieldSchema = Joi.alternatives().try(
+            Joi.number().min(0).messages({
+              'number.base': `Custom field '${rule.label}' must be a numeric format.`,
+              'number.min': `Custom field '${rule.label}' value cannot be negative.`
+            }),
+            Joi.string().valid('').empty('')
+          );
+          break;
+
+        case 'url':
+          joiFieldSchema = Joi.string().trim().regex(REGEX_PATTERNS.URL).messages({
+            'string.pattern.base': `Custom field '${rule.label}' must be a valid URL string.`
+          });
+          break;
+
+        default:
+          joiFieldSchema = Joi.any();
+          break;
       }
+
+      if (normalizedType !== 'fileupload' && normalizedType !== 'file') {
+        if (rule.is_required) {
+          joiFieldSchema = joiFieldSchema.required().messages({
+            'any.required': `The dynamic field '${rule.label}' is marked mandatory.`,
+            'string.empty': `The dynamic field '${rule.label}' cannot be left empty.`
+          });
+        } else {
+          joiFieldSchema = joiFieldSchema.optional().allow('', null);
+        }
+      }
+
+      dynamicJoiRules[rule.key] = joiFieldSchema;
     }
 
     const compiledSchema = Joi.object(dynamicJoiRules).unknown(true);
@@ -247,13 +220,14 @@ const configValidation = async (req, res, next) => {
       for (let j = 0; j < error.details.length; j++) {
         errorMessagesArray.push(error.details[j].message);
       }
-      const completeErrorMessage = errorMessagesArray.join(' ');
+      const completeErrorMessage = errorMessagesArray.join('; ');
       return next(new AppError(completeErrorMessage, 400));
     }
 
     req.body.custom_values = value;
     return next();
-  } catch (error) {
+  } 
+  catch (error) {
     return next(error);
   }
 };

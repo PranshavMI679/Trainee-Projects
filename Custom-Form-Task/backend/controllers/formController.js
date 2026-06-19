@@ -6,19 +6,17 @@ const isFieldDeleted = (fieldItem) => {
   if (!fieldItem || !fieldItem.options) return false;
   let opts = fieldItem.options;
   
-  while (typeof opts === 'string') {
+  if (typeof opts === 'string') {
     try {
-      const parsed = JSON.parse(opts);
-      if (parsed && typeof parsed === 'object') {
-        opts = parsed;
-      } else {
-        break;
+      opts = JSON.parse(opts);
+      if (typeof opts === 'string') {
+        opts = JSON.parse(opts);
       }
     } catch (e) {
-      break;
+      return false;
     }
   }
-  if (!opts || typeof opts !== 'object') return false;
+  if (!opts || typeof opts !== 'object' || Array.isArray(opts)) return false;
   return opts.is_deleted_field === true || 
          opts.is_deleted_field === 'true' ||
          opts.is_delete === true ||
@@ -234,7 +232,7 @@ exports.processFormDetails = async (req, res, next) => {
     const { name, email, custom_values } = req.body;
 
     let record;
-    let fieldsConfig;
+    let fieldsConfig = [];
     let finalCustomValues = {};
     let isNewSubmission = false;
     let clientId;
@@ -264,8 +262,7 @@ exports.processFormDetails = async (req, res, next) => {
           const currentInput = custom_values[key];
 
           if (currentInput === null || currentInput === undefined || 
-            (typeof currentInput === 'string' && currentInput.trim() === "")) 
-            {
+             (typeof currentInput === 'string' && currentInput.trim() === "")) {
             delete finalCustomValues[key];
           } else {
             finalCustomValues[key] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
@@ -277,16 +274,22 @@ exports.processFormDetails = async (req, res, next) => {
     const allFields = await FormConfig.findAll({ 
       where: { client_id: clientId },
       order: [
+        ['updated_at', 'DESC'], 
         ['section_order', 'ASC'],
         ['area_order', 'ASC'],
         ['field_order', 'ASC']
       ]
     });
     
-    fieldsConfig = [];
+    const observedKeys = new Set();
+
     for (let i = 0; i < allFields.length; i++) {
-      if (!isFieldDeleted(allFields[i])) {
-        fieldsConfig.push(allFields[i]);
+      const fieldRow = allFields[i];
+      if (!fieldRow.key || observedKeys.has(fieldRow.key)) continue;
+
+      if (!isFieldDeleted(fieldRow)) {
+        observedKeys.add(fieldRow.key);
+        fieldsConfig.push(fieldRow);
       }
     }
     
@@ -333,8 +336,10 @@ exports.processFormDetails = async (req, res, next) => {
       if (field.options) {
         try {
           let opts = typeof field.options === 'string' ? JSON.parse(field.options) : field.options;
-          if (opts && opts.value) {
-            displayOptions = Array.isArray(opts.value) ? opts.value : null;
+          if (Array.isArray(opts)) {
+            displayOptions = opts;
+          } else if (opts && Array.isArray(opts.value)) {
+            displayOptions = opts.value;
           }
         } catch (e) {
           displayOptions = null;
@@ -371,7 +376,7 @@ exports.processFormDetails = async (req, res, next) => {
     return res.status(isNewSubmission ? 201 : 200).json({
       success: true,
       message: isNewSubmission ? "Employee data captured successfully." : "Employee data updated successfully.",
-      id: record.employee_id,
+      id: record.employee_id || record.id,
       employee_code: record.employee_code,
       name: record.name,
       email: record.email,
@@ -382,4 +387,3 @@ exports.processFormDetails = async (req, res, next) => {
     return next(error);
   }
 };
-

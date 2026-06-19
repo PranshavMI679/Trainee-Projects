@@ -22,10 +22,8 @@ const VALID_TYPES = [
   'file', 'File'
 ];
 
-const optionsSchema = Joi.object({
-  is_multiple: Joi.boolean().required().messages({
-    'any.required': 'The is_multiple selection parameter flag is required.'
-  }),
+const baseOptionsSchema = Joi.object({
+  is_multiple: Joi.boolean().optional(),
   value: Joi.array().items(Joi.string().trim().required()).min(1).optional().messages({
     'array.min': 'The options value configuration list requires at least one option item entry.'
   }),
@@ -87,14 +85,18 @@ const singleFieldSchema = Joi.object({
       'number.integer': ErrorMessages.VALIDATION.FIELD_LENGTH_INTEGER
     }),
 
-  options: optionsSchema
+  options: baseOptionsSchema
     .allow(null)
     .optional()
     .when('type', {
       is: Joi.string().valid('dropdown', 'Dropdown', 'radio', 'Radio', 'radioselection', 'Radio Selection', 'checkbox', 'Checkbox'),
       then: Joi.object({
-        is_multiple: Joi.boolean().required(),
-        value: Joi.array().items(Joi.string().trim().required()).min(1).required()
+        is_multiple: Joi.boolean().required().messages({
+          'any.required': 'The is_multiple selection parameter flag is required.'
+        }),
+        value: Joi.array().items(Joi.string().trim().required()).min(1).required().messages({
+          'any.required': 'Choice selectors require a populated options list.'
+        })
       }).required().messages({
         'any.required': 'Choice selectors Dropdown, Radio, and Checkbox require a populated options configurations object block containing a value list.'
       }),
@@ -174,7 +176,7 @@ const editFieldSchema = Joi.object({
       'number.integer': ErrorMessages.VALIDATION.FIELD_LENGTH_INTEGER
     }),
 
-  options: optionsSchema
+  options: baseOptionsSchema
     .allow(null)
     .optional()
     .when('type', {
@@ -185,6 +187,8 @@ const editFieldSchema = Joi.object({
       }).required(),
       otherwise: Joi.object().optional()
     }),
+
+  is_delete: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false')).optional(),
 
   section_name: Joi.string().trim().max(100).optional(),
   section_order: Joi.number().integer().min(1).optional(),

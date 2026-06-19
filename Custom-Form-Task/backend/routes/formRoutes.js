@@ -10,6 +10,7 @@ router.get('/all', getAllDetails);
 router.get('/:client_code/layout', getFormLayout);
 router.get('/:employee_code/details', getEmployeeDetails);
 
-router.post('/:code/process', validator(formSchema), configValidation, processFormDetails);
+//router.post('/:code/process', validator(formSchema), configValidation, processFormDetails);
+router.post('/:code/process', configValidation, processFormDetails);
 
 module.exports = router;

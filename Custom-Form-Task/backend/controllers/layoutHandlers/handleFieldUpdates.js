@@ -1,9 +1,19 @@
 const { FormConfig, Form, DeleteHistory, sequelize } = require('../../models');
 const AppError = require('../../utils/appError');
 
+/**
+ * Safe integer parser helper to shield database insertions from NaN payloads.
+ */
+const safeInt = (value, fallbackValue) => {
+  if (value === undefined || value === null) return fallbackValue;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) || parsed < 0 ? fallbackValue : parsed;
+};
+
 module.exports = async (identifier, reqBody, t) => {
   let fields = reqBody.fields;
   
+  // 1. Normalize payload inputs to guarantee a consistent loop iteration structure
   if (!fields || !Array.isArray(fields)) {
     if (!reqBody.key) throw new AppError("Field identifier 'key' parameter is required.", 400);
     fields = [{ 
@@ -17,81 +27,136 @@ module.exports = async (identifier, reqBody, t) => {
       section_order: reqBody.section_order,
       area_name: reqBody.area_name,
       area_order: reqBody.area_order,
-      field_order: reqBody.field_order
+      field_order: reqBody.field_order,
+      is_delete: reqBody.is_delete
     }];
   }
 
+  const historyPayloads = [];
+  const keysToPurge = [];
+  let clientWorkspaceId = null;
+
+  // 2. Iterate through incoming fields configuration updates map
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i];
-    const targetKey = field.key ? field.key.trim() : '';
+    const targetKey = field.key ? String(field.key).trim() : '';
+    if (!targetKey) continue;
 
-    const existingLayout = await FormConfig.findOne({ where: { config_code: identifier, key: targetKey }, transaction: t });
+    const existingLayout = await FormConfig.findOne({ 
+      where: { config_code: identifier, key: targetKey }, 
+      transaction: t 
+    });
     if (!existingLayout) throw new AppError(`Target field layout not found for key '${targetKey}'.`, 404);
 
+    clientWorkspaceId = existingLayout.client_id;
+
+    // Direct object lookup from native JSONB column profile; fallback gracefully if relics exist
     let currentOptions = {};
     if (existingLayout.options) {
       if (typeof existingLayout.options === 'string') {
-        try { 
-          currentOptions = JSON.parse(existingLayout.options); 
-        } catch (e) { 
-          currentOptions = {}; 
-        }
+        try { currentOptions = JSON.parse(existingLayout.options); } catch (e) { currentOptions = {}; }
       } else if (typeof existingLayout.options === 'object') {
         currentOptions = existingLayout.options;
       }
     }
 
+    // --- CASE 1: CORE FIELD DELETION INTERCEPT ROUTINE ---
     if (field.is_delete === true || field.is_delete === 'true') {
       if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
         throw new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403);
       }
 
-      await DeleteHistory.create({
-        config_code: identifier, client_id: existingLayout.client_id, key: existingLayout.key,
-        label: existingLayout.label, type: existingLayout.type, is_required: existingLayout.is_required,
-        length: existingLayout.length, section_name: existingLayout.section_name, section_order: existingLayout.section_order,
-        area_name: existingLayout.area_name, area_order: existingLayout.area_order, field_order: existingLayout.field_order,
-        archived_options: currentOptions, action_type: 'SINGLE_FIELD_DELETE'
-      }, { transaction: t });
+      // Track deletion records inside batch payload container array
+      historyPayloads.push({
+        config_code: identifier,
+        client_id: existingLayout.client_id,
+        key: existingLayout.key,
+        label: existingLayout.label,
+        type: existingLayout.type,
+        is_required: existingLayout.is_required,
+        length: existingLayout.length,
+        section_name: existingLayout.section_name,
+        section_order: existingLayout.section_order,
+        area_name: existingLayout.area_name,
+        area_order: existingLayout.area_order,
+        field_order: existingLayout.field_order,
+        archived_options: currentOptions,
+        action_type: 'SINGLE_FIELD_DELETE'
+      });
+
+      keysToPurge.push(targetKey);
 
       const updatedOptions = { ...currentOptions, is_deleted_field: true };
-      await FormConfig.update({ options: updatedOptions }, { where: { config_code: identifier, key: targetKey }, transaction: t });
-      await Form.update({ custom_values: sequelize.literal("custom_values - '" + targetKey + "'") }, { where: { client_id: existingLayout.client_id }, transaction: t });
+      await FormConfig.update(
+        { options: updatedOptions }, 
+        { where: { config_code: identifier, key: targetKey }, transaction: t }
+      );
       continue; 
     }
 
-    let currentType = field.type ? field.type.trim() : existingLayout.type;
+    // --- CASE 2: FIELD SPECIFICATION UPDATE / REVIVAL ROUTINE ---
+    let currentType = field.type ? String(field.type).trim() : existingLayout.type;
     const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
 
     const isCurrentlyDeleted = currentOptions.is_deleted_field === true || currentOptions.is_deleted_field === 'true';
     if (isCurrentlyDeleted) {
-      console.log(`Auto-revived Field: '${targetKey}'. Area and Section containers are properly recreated.`);
       currentOptions.is_deleted_field = false;
     }
 
+    // Safely structure and deep-merge component values into the options schema mapping profile
     if (field.options && typeof field.options === 'object') {
       currentOptions = {
-        is_multiple: field.options.is_multiple !== undefined ? (field.options.is_multiple === true || field.options.is_multiple === 'true') : !!currentOptions.is_multiple,
-        can_delete: field.options.can_delete !== undefined ? (field.options.can_delete === true || field.options.can_delete === 'true') : (currentOptions.can_delete !== undefined ? currentOptions.can_delete : true),
-        value: Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : (currentOptions.value || []),
-        thousand_separator: field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : (currentOptions.thousand_separator || ','),
-        decimal_separator: field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : (currentOptions.decimal_separator || '.')
+        is_multiple: field.options.is_multiple !== undefined 
+          ? (field.options.is_multiple === true || field.options.is_multiple === 'true') 
+          : !!currentOptions.is_multiple,
+        can_delete: field.options.can_delete !== undefined 
+          ? (field.options.can_delete === true || field.options.can_delete === 'true') 
+          : (currentOptions.can_delete !== undefined ? currentOptions.can_delete : true),
+        value: Array.isArray(field.options.value) 
+          ? field.options.value.map(o => String(o).trim()) 
+          : (currentOptions.value || []),
+        thousand_separator: field.options.thousand_separator !== undefined 
+          ? String(field.options.thousand_separator) 
+          : (currentOptions.thousand_separator || ','),
+        decimal_separator: field.options.decimal_separator !== undefined 
+          ? String(field.options.decimal_separator) 
+          : (currentOptions.decimal_separator || '.')
       };
     }
 
     await FormConfig.update({
-      label: field.label ? field.label.trim() : existingLayout.label,
+      label: field.label ? String(field.label).trim() : existingLayout.label,
       type: currentType,
-      is_required: field.is_required !== undefined ? (field.is_required === true || field.is_required === 'true') : existingLayout.is_required,
-      length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || existingLayout.length),
+      is_required: field.is_required !== undefined 
+        ? (field.is_required === true || field.is_required === 'true') 
+        : existingLayout.is_required,
+      length: ['date', 'datetime'].includes(normalizedType) ? null : (safeInt(field.length, existingLayout.length)),
       options: currentOptions,
       
-      section_name: field.section_name ? field.section_name.trim() : existingLayout.section_name,
-      section_order: field.section_order !== undefined ? parseInt(field.section_order) : existingLayout.section_order,
-      area_name: field.area_name ? field.area_name.trim() : existingLayout.area_name,
-      area_order: field.area_order !== undefined ? parseInt(field.area_order) : existingLayout.area_order,
-      field_order: field.field_order !== undefined ? parseInt(field.field_order) : existingLayout.field_order
+      section_name: field.section_name ? String(field.section_name).trim() : existingLayout.section_name,
+      section_order: safeInt(field.section_order, existingLayout.section_order),
+      area_name: field.area_name ? String(field.area_name).trim() : existingLayout.area_name,
+      area_order: safeInt(field.area_order, existingLayout.area_order),
+      field_order: safeInt(field.field_order, existingLayout.field_order)
     }, { where: { config_code: identifier, key: targetKey }, transaction: t });
+  }
+
+  // --- POST-LOOP SECURE BATCH PURGE ENGINE ---
+  if (keysToPurge.length > 0 && clientWorkspaceId) {
+    // 1. Commit deletion histories inside a single optimized write statement
+    await DeleteHistory.bulkCreate(historyPayloads, { transaction: t });
+
+    // 2. Perform safe, high-performance PostgreSQL JSONB keys removal
+    await Form.update(
+      { 
+        custom_values: sequelize.literal(`custom_values - CAST(ARRAY[:keysToPurge] AS text[])`) 
+      },
+      { 
+        where: { client_id: clientWorkspaceId }, 
+        replacements: { keysToPurge }, // Defends application entirely from SQL injections
+        transaction: t 
+      }
+    );
   }
 
   return { message: "Form configuration updated successfully.", config_code: identifier };

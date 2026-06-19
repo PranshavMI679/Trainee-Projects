@@ -14,5 +14,4 @@ router.patch('/:config_code/reorder', validator(layoutReorderSchema), updateForm
 //router.delete('/:config_code/fields/:key/delete', deleteFieldFromLayout);
 router.delete('/:config_code/delete', deleteFieldFromLayout);
 
-
 module.exports = router;

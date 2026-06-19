@@ -27,13 +27,14 @@ const formSchema = Joi.object({
       'string.max': ErrorMessages.VALIDATION.EMAIL_TOO_LONG
     }),
 
-  custom_values: Joi.object()
-    .unknown(true)
-    .optional()
-    .default({})
-    .messages({
-      'object.base': ErrorMessages.VALIDATION.CUSTOM_VALUES_INVALID
-    })
+    custom_values: Joi.any().optional().default({})
+  // custom_values: Joi.object()
+  //   .unknown(true)
+  //   .optional()
+  //   .default({})
+  //   .messages({
+  //     'object.base': ErrorMessages.VALIDATION.CUSTOM_VALUES_INVALID
+  //   })
 });
 
 module.exports = { formSchema };
