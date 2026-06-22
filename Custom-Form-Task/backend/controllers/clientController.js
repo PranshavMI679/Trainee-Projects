@@ -1,3 +1,4 @@
+const { Sequelize } = require('sequelize');
 const { Client, Module } = require('../models');
 const AppError = require('../utils/appError');
 const { v4: uuidv4 } = require('uuid');

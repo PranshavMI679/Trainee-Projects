@@ -22,7 +22,7 @@ const VALID_TYPES = [
   'file', 'File'
 ];
 
-const baseOptionsSchema = Joi.object({
+const createBaseOptionsSchema = () => Joi.object({
   is_multiple: Joi.boolean().optional(),
   value: Joi.array().items(Joi.string().trim().required()).min(1).optional().messages({
     'array.min': 'The options value configuration list requires at least one option item entry.'
@@ -75,6 +75,7 @@ const singleFieldSchema = Joi.object({
     }),
 
   length: Joi.number()
+    .strict() 
     .integer()
     .min(1)
     .positive()
@@ -85,7 +86,7 @@ const singleFieldSchema = Joi.object({
       'number.integer': ErrorMessages.VALIDATION.FIELD_LENGTH_INTEGER
     }),
 
-  options: baseOptionsSchema
+  options: createBaseOptionsSchema()
     .allow(null)
     .optional()
     .when('type', {
@@ -98,16 +99,16 @@ const singleFieldSchema = Joi.object({
           'any.required': 'Choice selectors require a populated options list.'
         })
       }).required().messages({
-        'any.required': 'Choice selectors Dropdown, Radio, and Checkbox require a populated options configurations object block containing a value list.'
+        'any.required': 'Choice selectors Dropdown, Radio, and Checkbox require an options configuration object.'
       }),
       otherwise: Joi.object().optional()
     }),
 
   section_name: Joi.string().trim().max(100).optional(),
-  section_order: Joi.number().integer().min(1).optional(),
+  section_order: Joi.number().strict().integer().min(1).optional(),
   area_name: Joi.string().trim().max(100).optional(),
-  area_order: Joi.number().integer().min(1).optional(),
-  field_order: Joi.number().integer().min(1).optional()
+  area_order: Joi.number().strict().integer().min(1).optional(),
+  field_order: Joi.number().strict().integer().min(1).optional()
 });
 
 const configSchema = Joi.object({
@@ -122,11 +123,13 @@ const configSchema = Joi.object({
   fields: Joi.array()
     .items(singleFieldSchema)
     .min(1)
+    .unique('key')
     .required()
     .messages({
       'array.base': ErrorMessages.VALIDATION.FIELD_ARRAY_BASE,
       'any.required': ErrorMessages.VALIDATION.FIELD_ARRAY_BASE,
-      'array.min': ErrorMessages.VALIDATION.FIELD_ARRAY_MIN
+      'array.min': ErrorMessages.VALIDATION.FIELD_ARRAY_MIN,
+      'array.unique': 'Duplicate field key values are explicitly prohibited within the configuration array.'
     })
 });
 
@@ -166,6 +169,7 @@ const editFieldSchema = Joi.object({
     }),
 
   length: Joi.number()
+    .strict()
     .integer()
     .min(1)
     .positive()
@@ -176,7 +180,7 @@ const editFieldSchema = Joi.object({
       'number.integer': ErrorMessages.VALIDATION.FIELD_LENGTH_INTEGER
     }),
 
-  options: baseOptionsSchema
+  options: createBaseOptionsSchema()
     .allow(null)
     .optional()
     .when('type', {
@@ -191,10 +195,10 @@ const editFieldSchema = Joi.object({
   is_delete: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false')).optional(),
 
   section_name: Joi.string().trim().max(100).optional(),
-  section_order: Joi.number().integer().min(1).optional(),
+  section_order: Joi.number().strict().integer().min(1).optional(),
   area_name: Joi.string().trim().max(100).optional(),
-  area_order: Joi.number().integer().min(1).optional(),
-  field_order: Joi.number().integer().min(1).optional()
+  area_order: Joi.number().strict().integer().min(1).optional(),
+  field_order: Joi.number().strict().integer().min(1).optional()
 }).min(1);
 
 const structuralFieldSchema = Joi.object({
@@ -206,20 +210,22 @@ const structuralFieldSchema = Joi.object({
       'any.required': 'Field identifier key is required to alter positions.'
     }),
   section_name: Joi.string().trim().max(100).optional(),
-  section_order: Joi.number().integer().min(1).optional(), 
+  section_order: Joi.number().strict().integer().min(1).optional(), 
   area_name: Joi.string().trim().max(100).optional(),
-  area_order: Joi.number().integer().min(1).optional(), 
-  field_order: Joi.number().integer().min(1).optional()    
+  area_order: Joi.number().strict().integer().min(1).optional(), 
+  field_order: Joi.number().strict().integer().min(1).optional()    
 });
 
 const layoutReorderSchema = Joi.object({
   fields: Joi.array()
     .items(structuralFieldSchema)
     .min(1)
+    .unique('key') 
     .required()
     .messages({
       'array.base': 'Reordering data payload must be passed within an array list block.',
-      'array.min': 'Provide at least one component coordinate set to execute changes.'
+      'array.min': 'Provide at least one component coordinate set to execute changes.',
+      'array.unique': 'Each field key layout configuration identifier can only exist once inside the reordering shifts.'
     })
 });
 

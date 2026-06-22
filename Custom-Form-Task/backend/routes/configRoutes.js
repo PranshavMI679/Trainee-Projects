@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 
 const validator = require('../middleware/validator');
-const { configSchema, editFieldSchema, layoutReorderSchema } = require('../validations/config.validation');
+const { configSchema, layoutReorderSchema } = require('../validations/config.validation');
 const { getClientLayout, processConfigLayout, deleteFieldFromLayout, updateFormLayoutStructure } = require('../controllers/configController');
 
-router.get('/:client_code/client-layout', getClientLayout);
+router.get('/:module_code/client-layout', getClientLayout);
 
 router.post('/:identifier/process', validator(configSchema), processConfigLayout);
 
