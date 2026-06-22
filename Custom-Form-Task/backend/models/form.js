@@ -6,25 +6,20 @@ const Form = sequelize.define('Form', {
     type: DataTypes.UUID, 
     defaultValue: DataTypes.UUIDV4, 
     allowNull: false,
-    primaryKey: true      
+    primaryKey: true,
   },
   employee_id: {
     type: DataTypes.INTEGER, 
     autoIncrement: true,
     unique: true
   },
-  client_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false
+  client_code: {
+    type: DataTypes.UUID, 
+    allowNull: false,
   },
-  name: {
-    type: DataTypes.STRING(50),
-    allowNull: false
-  },
-  email: { 
-    type: DataTypes.STRING(255), 
-    allowNull: false, 
-    unique: true
+  module_code: {
+    type: DataTypes.UUID,
+    allowNull: false,
   },
   custom_values: {
     type: DataTypes.JSONB,
@@ -35,7 +30,18 @@ const Form = sequelize.define('Form', {
   tableName: 'forms',
   timestamps: true, 
   createdAt: 'created_at', 
-  updatedAt: 'updated_at' 
+  updatedAt: 'updated_at',
+  indexes: [
+    {
+      name: 'idx_forms_secure_entity_lookup',
+      fields: ['client_code', 'module_code', 'employee_code']
+    },
+    {
+      name: 'idx_forms_custom_values_gin',
+      using: 'gin',
+      fields: ['custom_values'] 
+    }
+  ]
 });
 
 module.exports = Form;

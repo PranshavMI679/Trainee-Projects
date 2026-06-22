@@ -10,56 +10,28 @@ const DeleteHistory = sequelize.define('DeleteHistory', {
   },
   config_code: {
     type: DataTypes.UUID,
+    allowNull: false,
+  },
+  client_code: {
+    type: DataTypes.UUID,
     allowNull: false
   },
-  client_id: {
-    type: DataTypes.INTEGER,
+  module_code: {
+    type: DataTypes.UUID,
     allowNull: false
   },
   key: {
     type: DataTypes.STRING(100),
     allowNull: false
   },
-  label: {
-    type: DataTypes.STRING(100),
-    allowNull: false
-  },
-  type: {
-    type: DataTypes.STRING(50),
-    allowNull: false
-  },
-  is_required: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false
-  },
-  length: {
-    type: DataTypes.INTEGER,
-    allowNull: true
-  },
-  section_name: {
-    type: DataTypes.STRING(100),
-    allowNull: false
-  },
-  section_order: {
-    type: DataTypes.INTEGER,
-    allowNull: false
-  },
-  area_name: {
-    type: DataTypes.STRING(100),
-    allowNull: false
-  },
-  area_order: {
-    type: DataTypes.INTEGER,
-    allowNull: false
-  },
-  field_order: {
-    type: DataTypes.INTEGER,
+  archived_meta: {
+    type: DataTypes.JSONB,
     allowNull: false
   },
   archived_options: {
     type: DataTypes.JSONB,
-    allowNull: false
+    allowNull: true,
+    defaultValue: null
   },
   action_type: {
     type: DataTypes.STRING(50),
@@ -72,15 +44,11 @@ const DeleteHistory = sequelize.define('DeleteHistory', {
   updatedAt: 'updated_at',
   indexes: [
     {
-      name: 'idx_del_hist_config_code',
-      fields: ['config_code']
+      name: 'idx_delete_histories_secure_lookup',
+      fields: ['client_code', 'module_code']
     },
     {
-      name: 'idx_del_hist_client_id',
-      fields: ['client_id']
-    },
-    {
-      name: 'idx_del_hist_composite_lookup',
+      name: 'idx_delete_histories_composite_find',
       fields: ['config_code', 'key']
     }
   ]

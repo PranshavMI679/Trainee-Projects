@@ -7,14 +7,18 @@ const FormConfig = sequelize.define('FormConfig', {
     allowNull: false,
     primaryKey: true 
   },
+  client_code: {
+    type: DataTypes.UUID, 
+    allowNull: false
+  },
+  module_code: {
+    type: DataTypes.UUID, 
+    allowNull: false
+  },
   key: {
     type: DataTypes.STRING(100),
     allowNull: false,
     primaryKey: true
-  },
-  client_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false
   },
   label: {
     type: DataTypes.STRING(100),
@@ -38,7 +42,6 @@ const FormConfig = sequelize.define('FormConfig', {
     allowNull: true,
     defaultValue: null
   },
-
   section_name: {
     type: DataTypes.STRING(100),
     allowNull: false,
@@ -71,11 +74,16 @@ const FormConfig = sequelize.define('FormConfig', {
   updatedAt: 'updated_at',
   indexes: [
     { 
+      name: 'idx_form_configs_code',
       fields: ['config_code'] 
     },
     {
-      name: 'idx_form_configs_layout_sorting',
-      fields: ['client_id', 'config_code', 'section_order', 'area_order', 'field_order']
+      name: 'idx_form_configs_secure_lookup',
+      fields: ['client_code', 'module_code']
+    },
+    {
+      name: 'idx_form_configs_layout_sorting_v2',
+      fields: ['client_code', 'module_code', 'config_code', 'section_order', 'area_order', 'field_order']
     }
   ]
 });
