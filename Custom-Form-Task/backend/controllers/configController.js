@@ -2,10 +2,6 @@ const { Client, Module, FormConfig, DeleteHistory, Form, sequelize } = require('
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 
-//const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
-//const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
-//const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
-
 const isFieldDeleted = (fieldItem) => {
   let opts = {};
   if (fieldItem.options) {
@@ -97,24 +93,17 @@ exports.processConfigLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const { identifier } = req.params; 
-    const { target_type, fields } = req.body;
+    const { fields } = req.body; 
 
     let result;
+    const targetModule = await Module.findOne({ where: { module_code: identifier }, transaction: t });
 
-    if (target_type === 'SECTION' || target_type === 'AREA') {
-      const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
-      result = await handleBulkDelete(identifier, req.body, t);
-    } 
-    else {
-      const targetModule = await Module.findOne({ where: { module_code: identifier }, transaction: t });
-
-      if (targetModule) {
-        const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
-        result = await handleBulkCreate(targetModule, fields, t);
-      } else {
-        const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
-        result = await handleFieldUpdates(identifier, req.body, t);
-      }
+    if (targetModule) {
+      const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
+      result = await handleBulkCreate(targetModule, fields, t);
+    } else {
+      const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
+      result = await handleFieldUpdates(identifier, req.body, t);
     }
 
     await t.commit();

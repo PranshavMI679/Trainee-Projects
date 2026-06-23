@@ -238,7 +238,7 @@ exports.getEmployeeDetails = async (req, res, next) => {
 exports.processFormDetails = async (req, res, next) => {
   try {
     const { code } = req.params; 
-    const { name, email, custom_values } = req.body;
+    const { custom_values } = req.body; 
 
     let record;
     let fieldsConfig = [];
@@ -254,13 +254,7 @@ exports.processFormDetails = async (req, res, next) => {
       currentClientCode = targetModule.client_code;
       currentModuleCode = targetModule.module_code;
       finalCustomValues = custom_values || {};
-
-      if (!name || !email) {
-        return next(new AppError("Root parameters 'name' and 'email' are strictly required for new submissions.", 400));
-      }
       
-      finalCustomValues.name = String(name).trim();
-      finalCustomValues.email = String(email).trim();
     } else {
       record = await Form.findOne({ where: { employee_code: String(code).trim().toUpperCase() } });
       if (!record) {
@@ -276,17 +270,13 @@ exports.processFormDetails = async (req, res, next) => {
           const key = inputKeys[i];
           const currentInput = custom_values[key];
 
-          if (currentInput === null || currentInput === undefined || 
-             (typeof currentInput === 'string' && currentInput.trim() === "")) {
+          if (currentInput === null || currentInput === undefined || (typeof currentInput === 'string' && currentInput.trim() === "")) {
             delete finalCustomValues[key];
           } else {
             finalCustomValues[key] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
           }
         }
       }
-      
-      if (name !== undefined) finalCustomValues.name = String(name).trim();
-      if (email !== undefined) finalCustomValues.email = String(email).trim();
     }
 
     const allFields = await FormConfig.findAll({ 
@@ -394,13 +384,13 @@ exports.processFormDetails = async (req, res, next) => {
       data: {
         id: record.employee_id,
         employee_code: record.employee_code,
-        name: record.custom_values?.name || "",
+        name: record.custom_values?.first_name || record.custom_values?.project_title || record.custom_values?.name || "",
         email: record.custom_values?.email || "",
         config: formattedConfig
       }
     });
-
-  } catch (error) {
+  } 
+  catch (error) {
     return next(error);
   }
 };

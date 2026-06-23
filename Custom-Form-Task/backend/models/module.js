@@ -21,12 +21,27 @@ const Module = sequelize.define('Module', {
   module_name: {
     type: DataTypes.STRING(100),
     allowNull: false,
+  },
+  slug: {
+    type: DataTypes.STRING(120),
+    allowNull: false
   }
 }, {
   tableName: 'modules',
   timestamps: true,
   createdAt: 'created_at',
   updatedAt: 'updated_at',
+  hooks: {
+    beforeValidate: (moduleInstance) => {
+      if (moduleInstance.module_name) {
+        moduleInstance.slug = moduleInstance.module_name
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/[\s_]+/g, '-');     
+      }
+    }
+  },
   indexes: [
     {
       name: 'idx_modules_secure_client_lookup',
@@ -40,6 +55,11 @@ const Module = sequelize.define('Module', {
       unique: true,
       name: 'uidx_modules_client_name_collision',
       fields: ['client_code', 'module_name'] 
+    },
+    {
+      unique: true,
+      name: 'uidx_client_module_slug_collision',
+      fields: ['client_code', 'slug']
     }
   ]
 });
