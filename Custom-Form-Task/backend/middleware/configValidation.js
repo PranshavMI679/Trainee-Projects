@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { FormConfig, Form, Client } = require('../models');
+const { FormConfig, Form, Client, Module } = require('../models');
 const AppError = require('../utils/appError');
 
 const REGEX_PATTERNS = {
@@ -20,12 +20,14 @@ const configValidation = async (req, res, next) => {
     }
 
     let allRules = [];
-
     if (lookupIdentifier.toUpperCase().startsWith('EMP')) {
       const employeeRecord = await Form.findOne({ where: { employee_code: lookupIdentifier.toUpperCase() } });
       if (employeeRecord) {
         allRules = await FormConfig.findAll({ 
-          where: { client_id: employeeRecord.client_id },
+          where: { 
+            client_code: employeeRecord.client_code,
+            module_code: employeeRecord.module_code 
+          },
           order: [
             ['created_at', 'DESC'],
             ['section_order', 'ASC'],
@@ -35,11 +37,11 @@ const configValidation = async (req, res, next) => {
         });
       }
     } else {
-      const targetClient = await Client.findOne({ where: { client_code: lookupIdentifier } });
+      const targetModule = await Module.findOne({ where: { module_code: lookupIdentifier } });
 
-      if (targetClient) {
+      if (targetModule) {
         allRules = await FormConfig.findAll({ 
-          where: { client_id: targetClient.client_id },
+          where: { module_code: targetModule.module_code },
           order: [
             ['created_at', 'DESC'],
             ['section_order', 'ASC'],
@@ -48,15 +50,29 @@ const configValidation = async (req, res, next) => {
           ]
         });
       } else {
-        allRules = await FormConfig.findAll({ 
-          where: { config_code: lookupIdentifier },
-          order: [
-            ['created_at', 'DESC'],
-            ['section_order', 'ASC'],
-            ['area_order', 'ASC'],
-            ['field_order', 'ASC']
-          ]
-        });
+        const targetClient = await Client.findOne({ where: { client_code: lookupIdentifier } });
+
+        if (targetClient) {
+          allRules = await FormConfig.findAll({ 
+            where: { client_code: targetClient.client_code },
+            order: [
+              ['created_at', 'DESC'],
+              ['section_order', 'ASC'],
+              ['area_order', 'ASC'],
+              ['field_order', 'ASC']
+            ]
+          });
+        } else {
+          allRules = await FormConfig.findAll({ 
+            where: { config_code: lookupIdentifier },
+            order: [
+              ['created_at', 'DESC'],
+              ['section_order', 'ASC'],
+              ['area_order', 'ASC'],
+              ['field_order', 'ASC']
+            ]
+          });
+        }
       }
     }
 
@@ -68,7 +84,7 @@ const configValidation = async (req, res, next) => {
           ['section_order', 'ASC'],
           ['area_order', 'ASC'],
           ['field_order', 'ASC']
-          ]
+        ]
       });
     }
 
@@ -80,12 +96,10 @@ const configValidation = async (req, res, next) => {
       if (!currentRule.key || observedKeys.has(currentRule.key)) continue;
 
       const opts = currentRule.options || {};
-      
       const isDeletedField = opts.is_deleted_field === true || 
                              opts.is_deleted_field === 'true' ||
                              opts.is_delete === true || 
                              opts.is_delete === 'true';
-
       if (!isDeletedField) {
         observedKeys.add(currentRule.key);
         rules.push(currentRule);
@@ -93,11 +107,10 @@ const configValidation = async (req, res, next) => {
     }
 
     if (rules.length === 0) {
-      return next(new AppError("Validation configuration block could not be resolved. Ensure the client code or layout config UUID is active and registered in your database.", 400));
+      return next(new AppError("Validation configuration block could not be resolved. Ensure the module code, client code, or config UUID is active and registered in your database.", 400));
     }
 
     const dynamicJoiRules = {};
-
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i];
       let joiFieldSchema;
@@ -188,7 +201,6 @@ const configValidation = async (req, res, next) => {
             'string.pattern.base': `Custom field '${rule.label}' must be a valid URL string.`
           });
           break;
-
         default:
           joiFieldSchema = Joi.any();
           break;
@@ -204,12 +216,10 @@ const configValidation = async (req, res, next) => {
           joiFieldSchema = joiFieldSchema.optional().allow('', null);
         }
       }
-
       dynamicJoiRules[rule.key] = joiFieldSchema;
     }
 
     const compiledSchema = Joi.object(dynamicJoiRules).unknown(true);
-
     const { error, value } = compiledSchema.validate(custom_values || {}, {
       abortEarly: false,
       stripUnknown: false  
@@ -223,7 +233,6 @@ const configValidation = async (req, res, next) => {
       const completeErrorMessage = errorMessagesArray.join('; ');
       return next(new AppError(completeErrorMessage, 400));
     }
-
     req.body.custom_values = value;
     return next();
   } 

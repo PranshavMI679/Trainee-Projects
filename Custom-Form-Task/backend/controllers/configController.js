@@ -1,11 +1,10 @@
-const { Client, FormConfig, Form, DeleteHistory, sequelize } = require('../models');
+const { Client, Module, FormConfig, DeleteHistory, Form, sequelize } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
-const { v4: uuidv4 } = require('uuid');
 
-const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
-const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
-const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
+//const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
+//const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
+//const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
 
 const isFieldDeleted = (fieldItem) => {
   let opts = {};
@@ -16,25 +15,29 @@ const isFieldDeleted = (fieldItem) => {
       opts = fieldItem.options;
     }
   }
-  return opts.is_deleted_field === true || opts.is_deleted_field === 'true';
+  return opts.is_deleted_field === true || 
+         opts.is_deleted_field === 'true' || 
+         opts.is_delete === true || 
+         opts.is_delete === 'true';
 };
 
 exports.getClientLayout = async (req, res, next) => {
   try {
-    const { client_code } = req.params;
+    const { module_code } = req.params;
 
-    const targetClient = await Client.findOne({ where: { client_code } });
-    if (!targetClient) {
-      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+    const targetModule = await Module.findOne({ where: { module_code } });
+    if (!targetModule) {
+      return next(new AppError("The target application workspace module was not found.", 404));
     }
 
     const allLayouts = await FormConfig.findAll({ 
-      where: { client_id: targetClient.client_id },
+      where: { module_code: targetModule.module_code },
       order: [
         ['section_order', 'ASC'],
         ['area_order', 'ASC'],
         ['field_order', 'ASC']
-      ]
+      ],
+      raw: true 
     });
 
     const sectionsMap = [];
@@ -76,12 +79,14 @@ exports.getClientLayout = async (req, res, next) => {
     }
 
     return res.status(200).json({
-      success: true,
-      client_id: targetClient.client_id,
-      client_code: targetClient.client_code,
-      client_name: targetClient.client_name,
-      sections_count: sectionsMap.length,
-      sections: sectionsMap
+      status: 'success',
+      data: {
+        client_code: targetModule.client_code,
+        module_code: targetModule.module_code,
+        module_name: targetModule.module_name,
+        sections_count: sectionsMap.length,
+        sections: sectionsMap
+      }
     });
   } catch (error) {
     return next(error);
@@ -97,23 +102,28 @@ exports.processConfigLayout = async (req, res, next) => {
     let result;
 
     if (target_type === 'SECTION' || target_type === 'AREA') {
+      const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
       result = await handleBulkDelete(identifier, req.body, t);
     } 
     else {
-      const targetClient = await Client.findOne({ where: { client_code: identifier }, transaction: t });
+      const targetModule = await Module.findOne({ where: { module_code: identifier }, transaction: t });
 
-      if (targetClient) {
-        result = await handleBulkCreate(targetClient, fields, t);
+      if (targetModule) {
+        const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
+        result = await handleBulkCreate(targetModule, fields, t);
       } else {
+        const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
         result = await handleFieldUpdates(identifier, req.body, t);
       }
     }
 
     await t.commit();
     return res.status(result.status || 200).json({
-      success: true,
+      status: 'success',
       message: result.message,
-      config_code: result.config_code || identifier
+      data: {
+        config_code: result.config_code || identifier
+      }
     });
 
   } catch (error) {
@@ -130,7 +140,7 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
 
     if (!fields || !Array.isArray(fields) || fields.length === 0) {
       await t.rollback();
-      return next(new AppError("Reordering payload data must contain a valid, non-empty array list of fields.", 400));
+      return next(new AppError("Reordering payload data must contain a valid, non-empty array list of structural coordinate updates.", 400));
     }
 
     for (const field of fields) {
@@ -139,20 +149,21 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
 
       const existingRow = await FormConfig.findOne({
         where: { config_code, key: targetKey },
+        attributes: ['section_name', 'section_order', 'area_name', 'area_order', 'field_order'],
         transaction: t
       });
 
       if (!existingRow) {
         await t.rollback();
-        return next(new AppError(`Target layout field not found for key: '${targetKey}'`, 404));
+        return next(new AppError(`Target configuration layout line item row not found for identifier field key: '${targetKey}'`, 404));
       }
 
       const finalSectionName = field.section_name !== undefined ? String(field.section_name).trim() : existingRow.section_name;
       const finalAreaName = field.area_name !== undefined ? String(field.area_name).trim() : existingRow.area_name;
       
-      const finalSectionOrder = field.section_order !== undefined ? parseInt(field.section_order) : existingRow.section_order;
-      const finalAreaOrder = field.area_order !== undefined ? parseInt(field.area_order) : existingRow.area_order;
-      const finalFieldOrder = field.field_order !== undefined ? parseInt(field.field_order) : existingRow.field_order;
+      const finalSectionOrder = field.section_order !== undefined ? parseInt(field.section_order, 10) : existingRow.section_order;
+      const finalAreaOrder = field.area_order !== undefined ? parseInt(field.area_order, 10) : existingRow.area_order;
+      const finalFieldOrder = field.field_order !== undefined ? parseInt(field.field_order, 10) : existingRow.field_order;
 
       await FormConfig.update({
         section_name: finalSectionName,
@@ -167,15 +178,13 @@ exports.updateFormLayoutStructure = async (req, res, next) => {
         individualHooks: false    
       });
     }
-
     await t.commit();
-
     return res.status(200).json({
-      success: true,
+      status: 'success',
       message: "Form structural layout transformations and sorting order parameters applied successfully."
     });
-
-  } catch (error) {
+  } 
+  catch (error) {
     try { await t.rollback(); } catch (err) {}
     return next(error);
   }
@@ -196,11 +205,12 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
         area_name: req.body.area_name
       };
 
+      const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
       const result = await handleBulkDelete(config_code, mockBody, t);
       await t.commit();
       
       return res.status(200).json({
-        success: true,
+        status: 'success',
         message: result.message
       });
     }
@@ -223,7 +233,7 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
     let currentOptions = {};
     if (existingLayout.options) {
       if (typeof existingLayout.options === 'string') {
-        try { currentOptions = JSON.parse(existingLayout.options); } catch (e) {}
+        try { currentOptions = JSON.parse(existingLayout.options); } catch (e) { currentOptions = {}; }
       } else if (typeof existingLayout.options === 'object') {
         currentOptions = existingLayout.options;
       }
@@ -234,24 +244,26 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
       return next(new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403));
     }
 
-    const currentClientId = existingLayout.client_id;
     const updatedOptions = { ...currentOptions, is_deleted_field: true };
 
     await DeleteHistory.create({
       config_code: existingLayout.config_code,
-      client_id: existingLayout.client_id,
+      client_code: existingLayout.client_code,
+      module_code: existingLayout.module_code,
       key: existingLayout.key,
-      label: existingLayout.label,
-      type: existingLayout.type,
-      is_required: existingLayout.is_required,
-      length: existingLayout.length,
-      section_name: existingLayout.section_name,
-      section_order: existingLayout.section_order,
-      area_name: existingLayout.area_name,
-      area_order: existingLayout.area_order,
-      field_order: existingLayout.field_order,
+      action_type: 'SINGLE_FIELD_SOFT_DELETE',
       archived_options: currentOptions, 
-      action_type: 'SINGLE_FIELD_SOFT_DELETE'
+      archived_meta: {
+        label: existingLayout.label,
+        type: existingLayout.type,
+        is_required: existingLayout.is_required,
+        length: existingLayout.length,
+        section_name: existingLayout.section_name,
+        section_order: existingLayout.section_order,
+        area_name: existingLayout.area_name,
+        area_order: existingLayout.area_order,
+        field_order: existingLayout.field_order
+      }
     }, { transaction: t });
 
     await FormConfig.update(
@@ -259,18 +271,24 @@ exports.deleteFieldFromLayout = async (req, res, next) => {
       { where: { config_code, key: targetKey }, transaction: t }
     );
 
-    // await Form.update(
-    //   { custom_values: sequelize.literal("custom_values - '" + targetKey + "'") },
-    //   { where: { client_id: currentClientId }, transaction: t }
-    // );
+    await Form.update(
+      { custom_values: sequelize.literal(`custom_values - '${targetKey}'`) },
+      { 
+        where: { 
+          client_code: existingLayout.client_code, 
+          module_code: existingLayout.module_code 
+        }, 
+        transaction: t 
+      }
+    );
 
     await t.commit();
     return res.status(200).json({
-      success: true,
-      message: `Form field element key '${targetKey}' was successfully soft-deleted, logged to history, and removed from profiles.`
+      status: 'success',
+      message: `Form field element key '${targetKey}' was successfully soft-deleted, logged to history, and removed from active profiles.`
     });
-
-  } catch (error) {
+  } 
+  catch (error) {
     try { await t.rollback(); } catch (rollbackErr) {}
     return next(error);
   }

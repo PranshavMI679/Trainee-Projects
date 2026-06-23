@@ -1,4 +1,4 @@
-const { Form, FormConfig, Client } = require('../models');
+const { Form, FormConfig, Client, Module } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 
@@ -25,20 +25,24 @@ const isFieldDeleted = (fieldItem) => {
 
 exports.getFormLayout = async (req, res, next) => {
   try {
-    const { client_code } = req.params;
+    const { module_code } = req.params;
+    const targetModule = await Module.findOne({ 
+      where: { module_code },
+      include: [{ model: Client, as: 'clientWorkspace', attributes: ['client_name'] }]
+    });
 
-    const targetClient = await Client.findOne({ where: { client_code } });
-    if (!targetClient) {
-      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
+    if (!targetModule) {
+      return next(new AppError("The target application workspace module was not found.", 404));
     }
                                                                                                                                                                                                                                            
     const allFields = await FormConfig.findAll({
-      where: { client_id: targetClient.client_id },
+      where: { module_code: targetModule.module_code },
       order: [
         ['section_order', 'ASC'],
         ['area_order', 'ASC'],
         ['field_order', 'ASC']
-      ]
+      ],
+      raw: true 
     });
 
     const sectionsMap = [];
@@ -88,31 +92,22 @@ exports.getFormLayout = async (req, res, next) => {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    sectionsMap.sort((a, b) => {
-      if (a.section_order !== b.section_order) {
-        return a.section_order - b.section_order;
-      }
-      return a.section_name.localeCompare(b.section_name);
-    });
-
+    sectionsMap.sort((a, b) => a.section_order - b.section_order || a.section_name.localeCompare(b.section_name));
     for (let i = 0; i < sectionsMap.length; i++) {
-      sectionsMap[i].section_areas.sort((a, b) => {
-        if (a.area_order !== b.area_order) {
-          return a.area_order - b.area_order;
-        }
-        return a.area_name.localeCompare(b.area_name);
-      });
+      sectionsMap[i].section_areas.sort((a, b) => a.area_order - b.area_order || a.area_name.localeCompare(b.area_name));
     }
 
     return res.status(200).json({
-      success: true,
-      client_name: targetClient.client_name,
-      form_template: {
-        employee_id: null,    
-        employee_code: null,   
-        name: "",               
-        email: "",              
-        sections: sectionsMap 
+      status: 'success',
+      data: {
+        client_name: targetModule.clientWorkspace?.client_name || "Unknown Tenant",
+        form_template: {
+          employee_id: null,    
+          employee_code: null,   
+          name: "",               
+          email: "",              
+          sections: sectionsMap 
+        }
       }
     });
   } catch (error) {
@@ -122,57 +117,64 @@ exports.getFormLayout = async (req, res, next) => {
 
 exports.getAllDetails = async (req, res, next) => {
   try {
+    const { module_code } = req.params;
+
     const entries = await Form.findAll({
-      order: [['employee_id', 'ASC']]
+      where: { module_code },
+      order: [['employee_id', 'ASC']],
+      include: [{
+        model: Module,
+        as: 'parentModule',
+        include: [{
+          model: FormConfig,
+          as: 'moduleConfigurations',
+          required: false
+        }]
+      }]
     });
 
     if (entries.length === 0) {
-      return res.status(200).json([]);
+      return res.status(200).json({
+        status: 'success',
+        results: 0,
+        data: { records: [] }
+      });
     }
 
-    const clientIds = [...new Set(entries.map(item => item.client_id))];
-    
-    const allBlueprints = await FormConfig.findAll({
-      where: { client_id: clientIds },
-      order: [
-        ['section_order', 'ASC'],
-        ['area_order', 'ASC'],
-        ['field_order', 'ASC']
-      ]
-    });
-
-    const blueprintMap = {};
-    allBlueprints.forEach(b => {
-      if (!isFieldDeleted(b)) {
-        if (!blueprintMap[b.client_id]) blueprintMap[b.client_id] = [];
-        blueprintMap[b.client_id].push(b);
-      }
-    });
-
     const payload = entries.map(item => {
-      const clientBlueprints = blueprintMap[item.client_id] || [];
+      const blueprints = item.parentModule?.moduleConfigurations || [];
 
-      const configMap = clientBlueprints.map(b => ({
-        config_code: b.config_code,
-        label: b.label,
-        key: b.key,
-        type: b.type,
-        section_name: b.section_name,
-        area_name: b.area_name,
-        options: b.options, 
-        value: item.custom_values && item.custom_values[b.key] !== undefined ? item.custom_values[b.key] : null
-      }));
+      const configMap = [];
+      for (let i = 0; i < blueprints.length; i++) {
+        const b = blueprints[i];
+        if (isFieldDeleted(b)) continue;
+
+        configMap.push({
+          config_code: b.config_code,
+          label: b.label,
+          key: b.key,
+          type: b.type,
+          section_name: b.section_name,
+          area_name: b.area_name,
+          options: b.options, 
+          value: item.custom_values?.[b.key] ?? null
+        });
+      }
 
       return {
         id: item.employee_id,
         employee_code: item.employee_code,
-        name: item.name,
-        email: item.email,
+        name: item.custom_values?.name || "",
+        email: item.custom_values?.email || "",
         config: configMap
       };
     });
 
-    return res.status(200).json(payload);
+    return res.status(200).json({
+      status: 'success',
+      results: payload.length,
+      data: { records: payload }
+    });
   } catch (error) {
     return next(error);
   }
@@ -182,44 +184,51 @@ exports.getEmployeeDetails = async (req, res, next) => {
   try {
     const { employee_code } = req.params;
 
-    const emp = await Form.findOne({ where: { employee_code } });
+    const emp = await Form.findOne({ 
+      where: { employee_code: employee_code.trim().toUpperCase() },
+      include: [{
+        model: Module,
+        as: 'parentModule',
+        include: [{
+          model: FormConfig,
+          as: 'moduleConfigurations',
+          required: false
+        }]
+      }]
+    });
+
     if (!emp) {
       return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
     }
 
-    const allBlueprints = await FormConfig.findAll({ 
-      where: { client_id: emp.client_id },
-      order: [
-        ['section_order', 'ASC'],
-        ['area_order', 'ASC'],
-        ['field_order', 'ASC']
-      ]
-    });
+    const rawBlueprints = emp.parentModule?.moduleConfigurations || [];
+    const configMap = [];
 
-    const blueprints = [];
-    for (let i = 0; i < allBlueprints.length; i++) {
-      if (!isFieldDeleted(allBlueprints[i])) {
-        blueprints.push(allBlueprints[i]);
-      }
+    for (let i = 0; i < rawBlueprints.length; i++) {
+      const b = rawBlueprints[i];
+      if (isFieldDeleted(b)) continue;
+
+      configMap.push({
+        config_code: b.config_code,
+        label: b.label,
+        key: b.key,
+        type: b.type,
+        section_name: b.section_name,
+        area_name: b.area_name,
+        options: b.options,
+        value: emp.custom_values?.[b.key] ?? null
+      });
     }
 
-    const configMap = blueprints.map(b => ({
-      config_code: b.config_code,
-      label: b.label,
-      key: b.key,
-      type: b.type,
-      section_name: b.section_name,
-      area_name: b.area_name,
-      options: b.options,
-      value: emp.custom_values && emp.custom_values[b.key] !== undefined ? emp.custom_values[b.key] : null
-    }));
-
     return res.status(200).json({
-      id: emp.employee_id,
-      employee_code: emp.employee_code,
-      name: emp.name,
-      email: emp.email,
-      config: configMap
+      status: 'success',
+      data: {
+        id: emp.employee_id,
+        employee_code: emp.employee_code,
+        name: emp.custom_values?.name || "",
+        email: emp.custom_values?.email || "",
+        config: configMap
+      }
     });
   } catch (error) {
     return next(error);
@@ -235,24 +244,30 @@ exports.processFormDetails = async (req, res, next) => {
     let fieldsConfig = [];
     let finalCustomValues = {};
     let isNewSubmission = false;
-    let clientId;
+    let currentClientCode;
+    let currentModuleCode;
 
-    const targetClient = await Client.findOne({ where: { client_code: code } });
+    const targetModule = await Module.findOne({ where: { module_code: code } });
 
-    if (targetClient) {
+    if (targetModule) {
       isNewSubmission = true;
-      clientId = targetClient.client_id;
+      currentClientCode = targetModule.client_code;
+      currentModuleCode = targetModule.module_code;
       finalCustomValues = custom_values || {};
 
       if (!name || !email) {
         return next(new AppError("Root parameters 'name' and 'email' are strictly required for new submissions.", 400));
       }
+      
+      finalCustomValues.name = String(name).trim();
+      finalCustomValues.email = String(email).trim();
     } else {
-      record = await Form.findOne({ where: { employee_code: code } });
+      record = await Form.findOne({ where: { employee_code: String(code).trim().toUpperCase() } });
       if (!record) {
-        return next(new AppError("The provided code does not match any active client layout or employee record.", 404));
+        return next(new AppError("The provided code does not match any active form module layout or employee record.", 404));
       }
-      clientId = record.client_id;
+      currentClientCode = record.client_code;
+      currentModuleCode = record.module_code;
       finalCustomValues = record.custom_values ? { ...record.custom_values } : {};
       
       if (custom_values && typeof custom_values === 'object') {
@@ -269,20 +284,23 @@ exports.processFormDetails = async (req, res, next) => {
           }
         }
       }
+      
+      if (name !== undefined) finalCustomValues.name = String(name).trim();
+      if (email !== undefined) finalCustomValues.email = String(email).trim();
     }
 
     const allFields = await FormConfig.findAll({ 
-      where: { client_id: clientId },
+      where: { module_code: currentModuleCode },
       order: [
         ['updated_at', 'DESC'], 
         ['section_order', 'ASC'],
         ['area_order', 'ASC'],
         ['field_order', 'ASC']
-      ]
+      ],
+      raw: true
     });
     
     const observedKeys = new Set();
-
     for (let i = 0; i < allFields.length; i++) {
       const fieldRow = allFields[i];
       if (!fieldRow.key || observedKeys.has(fieldRow.key)) continue;
@@ -310,15 +328,12 @@ exports.processFormDetails = async (req, res, next) => {
 
     if (isNewSubmission) {
       record = await Form.create({
-        client_id: clientId,
-        name,
-        email,
+        client_code: currentClientCode,
+        module_code: currentModuleCode,
         custom_values: finalCustomValues
       });
     } else {
       await record.update({
-        name: name !== undefined ? name : record.name,
-        email: email !== undefined ? email : record.email,
         custom_values: finalCustomValues
       });
     }
@@ -374,13 +389,15 @@ exports.processFormDetails = async (req, res, next) => {
     });
 
     return res.status(isNewSubmission ? 201 : 200).json({
-      success: true,
+      status: 'success',
       message: isNewSubmission ? "Employee data captured successfully." : "Employee data updated successfully.",
-      id: record.employee_id || record.id,
-      employee_code: record.employee_code,
-      name: record.name,
-      email: record.email,
-      config: formattedConfig
+      data: {
+        id: record.employee_id,
+        employee_code: record.employee_code,
+        name: record.custom_values?.name || "",
+        email: record.custom_values?.email || "",
+        config: formattedConfig
+      }
     });
 
   } catch (error) {

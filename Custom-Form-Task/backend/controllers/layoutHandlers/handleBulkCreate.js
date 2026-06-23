@@ -2,12 +2,13 @@ const { FormConfig } = require('../../models');
 const AppError = require('../../utils/appError');
 const { v4: uuidv4 } = require('uuid');
 
-module.exports = async (targetClient, fields, t) => {
+module.exports = async (targetModule, fields, t) => {
   if (!fields || !Array.isArray(fields) || fields.length === 0) {
     throw new AppError("Fields payload must be a non-empty array.", 400);
   }
 
   const unifiedFormConfigCode = uuidv4();
+  
   const bulkInsertPayload = fields.map(field => {
     if (!field.key || !field.label || !field.type) {
       throw new AppError("Each field structure must possess a valid key, label, and type.", 400);
@@ -29,7 +30,8 @@ module.exports = async (targetClient, fields, t) => {
 
     return {
       config_code: unifiedFormConfigCode,
-      client_id: targetClient.client_id,
+      client_code: targetModule.client_code,
+      module_code: targetModule.module_code,
       key: field.key.trim(),
       label: field.label.trim(),
       type: field.type.trim(),
@@ -37,13 +39,18 @@ module.exports = async (targetClient, fields, t) => {
       length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null),
       options: processedOptions,
       section_name: field.section_name ? field.section_name.trim() : 'General Information',
-      section_order: parseInt(field.section_order) || 1,
+      section_order: parseInt(field.section_order, 10) || 1,
       area_name: field.area_name ? field.area_name.trim() : 'Main Group',
-      area_order: parseInt(field.area_order) || 1,
-      field_order: parseInt(field.field_order) || 1
+      area_order: parseInt(field.area_order, 10) || 1,
+      field_order: parseInt(field.field_order, 10) || 1
     };
   });
 
   await FormConfig.bulkCreate(bulkInsertPayload, { transaction: t });
-  return { message: "Form configuration fields registered successfully.", config_code: unifiedFormConfigCode, status: 201 };
+  
+  return { 
+    message: "Form configuration fields registered and bound to module successfully.", 
+    config_code: unifiedFormConfigCode, 
+    status: 201 
+  };
 };

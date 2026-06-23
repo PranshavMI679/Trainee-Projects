@@ -25,7 +25,8 @@ module.exports = async (identifier, body, t) => {
 
   const historyPayloads = [];
   const processedKeys = [];
-  let clientWorkspaceId = null;
+  let currentClientCode = null;
+  let currentModuleCode = null;
 
   for (const fieldRow of targetedFields) {
     let currentOpts = {};
@@ -41,24 +42,28 @@ module.exports = async (identifier, body, t) => {
       continue; 
     }
 
-    clientWorkspaceId = fieldRow.client_id;
+    currentClientCode = fieldRow.client_code;
+    currentModuleCode = fieldRow.module_code;
     processedKeys.push(fieldRow.key);
 
     historyPayloads.push({
       config_code: identifier,
-      client_id: fieldRow.client_id,
+      client_code: fieldRow.client_code,
+      module_code: fieldRow.module_code,
       key: fieldRow.key,
-      label: fieldRow.label,
-      type: fieldRow.type,
-      is_required: fieldRow.is_required,
-      length: fieldRow.length,
-      section_name: fieldRow.section_name,
-      section_order: fieldRow.section_order,
-      area_name: fieldRow.area_name,
-      area_order: fieldRow.area_order,
-      field_order: fieldRow.field_order,
+      action_type: `CASCADING_${target_type}_DELETE`,
       archived_options: currentOpts,
-      action_type: `CASCADING_${target_type}_DELETE`
+      archived_meta: {
+        label: fieldRow.label,
+        type: fieldRow.type,
+        is_required: fieldRow.is_required,
+        length: fieldRow.length,
+        section_name: fieldRow.section_name,
+        section_order: fieldRow.section_order,
+        area_name: fieldRow.area_name,
+        area_order: fieldRow.area_order,
+        field_order: fieldRow.field_order
+      }
     });
 
     const updatedOptions = { ...currentOpts, is_deleted_field: true };
@@ -68,22 +73,22 @@ module.exports = async (identifier, body, t) => {
     );
   }
 
-  if (processedKeys.length > 0 && clientWorkspaceId) {
+  if (processedKeys.length > 0 && currentClientCode) {
     await DeleteHistory.bulkCreate(historyPayloads, { transaction: t });
-
     const postgresKeysFormattedArray = processedKeys.map(key => `'${key.replace(/'/g, "''")}'`).join(', ');
-
     await Form.update(
       { 
         custom_values: sequelize.literal(`custom_values - CAST(ARRAY[${postgresKeysFormattedArray}] AS text[])`)
       },
       { 
-        where: { client_id: clientWorkspaceId }, 
+        where: { 
+          client_code: currentClientCode,
+          module_code: currentModuleCode
+        }, 
         transaction: t 
       }
     );
   }
-
   const displayContainerName = target_type === 'SECTION' ? section_name : area_name;
   return { 
     message: `The entire ${target_type.toLowerCase()} layer '${displayContainerName}' was successfully deactivated, soft-deleted fields archived, and custom records purged.` 

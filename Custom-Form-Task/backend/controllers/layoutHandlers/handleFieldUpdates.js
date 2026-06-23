@@ -30,7 +30,8 @@ module.exports = async (identifier, reqBody, t) => {
 
   const historyPayloads = [];
   const keysToPurge = [];
-  let clientWorkspaceId = null;
+  let currentClientCode = null;
+  let currentModuleCode = null;
 
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i];
@@ -43,7 +44,8 @@ module.exports = async (identifier, reqBody, t) => {
     });
     if (!existingLayout) throw new AppError(`Target field layout not found for key '${targetKey}'.`, 404);
 
-    clientWorkspaceId = existingLayout.client_id;
+    currentClientCode = existingLayout.client_code;
+    currentModuleCode = existingLayout.module_code;
 
     let currentOptions = {};
     if (existingLayout.options) {
@@ -61,19 +63,22 @@ module.exports = async (identifier, reqBody, t) => {
 
       historyPayloads.push({
         config_code: identifier,
-        client_id: existingLayout.client_id,
+        client_code: existingLayout.client_code,
+        module_code: existingLayout.module_code,
         key: existingLayout.key,
-        label: existingLayout.label,
-        type: existingLayout.type,
-        is_required: existingLayout.is_required,
-        length: existingLayout.length,
-        section_name: existingLayout.section_name,
-        section_order: existingLayout.section_order,
-        area_name: existingLayout.area_name,
-        area_order: existingLayout.area_order,
-        field_order: existingLayout.field_order,
+        action_type: 'SINGLE_FIELD_DELETE',
         archived_options: currentOptions,
-        action_type: 'SINGLE_FIELD_DELETE'
+        archived_meta: {
+          label: existingLayout.label,
+          type: existingLayout.type,
+          is_required: existingLayout.is_required,
+          length: existingLayout.length,
+          section_name: existingLayout.section_name,
+          section_order: existingLayout.section_order,
+          area_name: existingLayout.area_name,
+          area_order: existingLayout.area_order,
+          field_order: existingLayout.field_order
+        }
       });
 
       keysToPurge.push(targetKey);
@@ -131,20 +136,21 @@ module.exports = async (identifier, reqBody, t) => {
     }, { where: { config_code: identifier, key: targetKey }, transaction: t });
   }
 
-  if (keysToPurge.length > 0 && clientWorkspaceId) {
+  if (keysToPurge.length > 0 && currentClientCode) {
     await DeleteHistory.bulkCreate(historyPayloads, { transaction: t });
-
     await Form.update(
       { 
         custom_values: sequelize.literal(`custom_values - CAST(ARRAY[:keysToPurge] AS text[])`) 
       },
       { 
-        where: { client_id: clientWorkspaceId }, 
+        where: { 
+          client_code: currentClientCode,
+          module_code: currentModuleCode
+        }, 
         replacements: { keysToPurge }, 
         transaction: t 
       }
     );
   }
-
   return { message: "Form configuration updated successfully.", config_code: identifier };
 };
