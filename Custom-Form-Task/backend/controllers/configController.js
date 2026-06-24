@@ -15,50 +15,76 @@ exports.getCombinedClientLayout = async (req, res, next) => {
     if (!targetClient) {
       return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
-
-    const activeLayoutConfigs = await FormConfig.findAll({
+    const baseConfigs = await FormConfig.findAll({
       where: { client_code },
-      include: [
-        {
-          model: Section,
-          as: 'sections',
-          where: { is_active: true }, 
-          required: false,
-          include: [
-            {
-              model: SectionArea,
-              as: 'areas',
-              where: { is_active: true },
-              required: false,
-              include: [
-                {
-                  model: Field,
-                  as: 'fields',
-                  where: { is_active: true },
-                  required: false
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      order: [
-        ['created_at', 'DESC'],
-        [{ model: Section, as: 'sections' }, 'section_order', 'ASC'],
-        [{ model: Section, as: 'sections' }, { model: SectionArea, as: 'areas' }, 'area_order', 'ASC'],
-        [{ model: Section, as: 'sections' }, { model: SectionArea, as: 'areas' }, { model: Field, as: 'fields' }, 'field_order', 'ASC']
-      ]
+      order: [['created_at', 'ASC']]
     });
 
+    const outputPayload = [];
+    for (const config of baseConfigs) {
+      const configJson = config.toJSON();
+      const sections = await Section.findAll({
+        where: { config_code: config.config_code },
+        order: [['section_order', 'ASC']],
+        raw: true
+      });
+
+      const structuredSections = [];
+
+      for (const sec of sections) {
+        const areas = await SectionArea.findAll({
+          where: { section_code: sec.section_code },
+          order: [['area_order', 'ASC']],
+          raw: true
+        });
+
+        const structuredAreas = [];
+
+        for (const ar of areas) {
+          const fields = await Field.findAll({
+            where: { area_code: ar.area_code },
+            order: [['field_order', 'ASC']],
+            raw: true
+          });
+
+          const activeFields = fields.filter(f => {
+            const opts = f.options || {};
+            const isDeletedField = opts.is_deleted_field === true || 
+                                   opts.is_deleted_field === 'true' ||
+                                   opts.is_delete === true || 
+                                   opts.is_delete === 'true';
+            return !isDeletedField;
+          });
+
+          if (activeFields.length > 0) {
+            structuredAreas.push({
+              ...ar,
+              fields: activeFields
+            });
+          }
+        }
+
+        if (structuredAreas.length > 0) {
+          structuredSections.push({
+            ...sec,
+            areas: structuredAreas
+          });
+        }
+      }
+      configJson.sections = structuredSections;
+      outputPayload.push(configJson);
+    }
     return res.status(200).json({
       success: true,
       data: {
         client_code: targetClient.client_code,
         client_name: targetClient.client_name,
-        configurations: activeLayoutConfigs
+        configurations: outputPayload
       }
     });
-  } catch (error) {
+  } 
+  catch (error) {
+    console.error("EXPLICIT POSTGRES ERROR DIAGNOSTIC:", error);
     return next(error);
   }
 };
@@ -66,16 +92,19 @@ exports.getCombinedClientLayout = async (req, res, next) => {
 exports.processConfigLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { client_code } = req.params;
-    const { module_code, config_name, fields } = req.body;
+    const { module_code } = req.params;
+    const { config_name, fields } = req.body; 
 
-    const targetModule = await Module.findOne({ where: { module_code, client_code }, transaction: t });
+    const targetModule = await Module.findOne({ where: { module_code }, transaction: t });
     if (!targetModule) {
-      return next(new AppError("Target application module was not found under this client context.", 404));
+      await t.rollback();
+      return next(new AppError("Target application module was not found in this workspace context.", 404));
     }
 
+    const extractedClientCode = targetModule.client_code;
+
     let [configRecord] = await FormConfig.findOrCreate({
-      where: { client_code, module_code },
+      where: { client_code: extractedClientCode, module_code },
       defaults: { config_name: config_name.trim() },
       transaction: t
     });

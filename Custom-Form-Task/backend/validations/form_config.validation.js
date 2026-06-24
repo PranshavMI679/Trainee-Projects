@@ -112,22 +112,6 @@ const singleFieldSchema = Joi.object({
 });
 
 const configSchema = Joi.object({
-  client_code: Joi.string()
-    .uuid({ version: 'uuidv4' })
-    .required()
-    .messages({
-      'string.guid': ErrorMessages.CLIENT.INVALID_UUID,
-      'any.required': ErrorMessages.CLIENT.CODE_REQUIRED
-    }),
-
-  module_code: Joi.string()
-    .uuid({ version: 'uuidv4' })
-    .required()
-    .messages({
-      'string.guid': ErrorMessages.VALIDATION.UUID_INVALID,
-      'any.required': ErrorMessages.VALIDATION.MODULE_CODE_REQUIRED
-    }),
-
   config_name: Joi.string()
     .trim()
     .max(100)

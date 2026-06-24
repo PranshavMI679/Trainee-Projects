@@ -7,7 +7,7 @@ const { getCombinedClientLayout, processConfigLayout, swapLayoutPositions, disab
 
 router.get('/combined-layout/:client_code', getCombinedClientLayout);
 
-router.post('/:client_code/process', validator(configSchema), processConfigLayout);
+router.post('/:module_code/process', validator(configSchema), processConfigLayout);
 
 router.patch('/:config_code/swap-sorting', validator(layoutReorderSchema), swapLayoutPositions);
 

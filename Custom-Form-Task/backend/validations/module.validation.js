@@ -3,14 +3,6 @@ const ErrorMessages = require('../utils/errorMessages');
 
 const moduleValidationSchemas = {
   createModule: Joi.object({
-    client_code: Joi.string()
-      .uuid({ version: 'uuidv4' })
-      .required()
-      .messages({
-        'string.guid': ErrorMessages.CLIENT.INVALID_UUID,
-        'any.required': ErrorMessages.CLIENT.CODE_REQUIRED
-      }),
-
     module_name: Joi.string()
       .trim()
       .max(100)
