@@ -1,10 +1,11 @@
-const { FormConfig, Form, DeleteHistory, sequelize } = require('../../models');
+const { FormConfig, Section, SectionArea, Field, DeleteHistory, FormDataSubmission, sequelize } = require('../../models');
 const AppError = require('../../utils/appError');
+const { v4: uuidv4 } = require('uuid');
 
 const safeInt = (value, fallbackValue) => {
   if (value === undefined || value === null) return fallbackValue;
   const parsed = parseInt(value, 10);
-  return isNaN(parsed) || parsed < 0 ? fallbackValue : parsed;
+  return isNaN(parsed) || parsed < 1 ? fallbackValue : parsed;
 };
 
 module.exports = async (identifier, reqBody, t) => {
@@ -32,125 +33,150 @@ module.exports = async (identifier, reqBody, t) => {
   const keysToPurge = [];
   let currentClientCode = null;
   let currentModuleCode = null;
+  const fieldsAffectedAreas = new Set();
 
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i];
     const targetKey = field.key ? String(field.key).trim() : '';
     if (!targetKey) continue;
 
-    const existingLayout = await FormConfig.findOne({ 
-      where: { config_code: identifier, key: targetKey }, 
+    const baseConfig = await FormConfig.findOne({ 
+      where: { config_code: identifier }, 
       transaction: t 
     });
-    if (!existingLayout) throw new AppError(`Target field layout not found for key '${targetKey}'.`, 404);
+    if (!baseConfig) throw new AppError("Target form configuration layout context tracing failed.", 404);
 
-    currentClientCode = existingLayout.client_code;
-    currentModuleCode = existingLayout.module_code;
+    currentClientCode = baseConfig.client_code;
+    currentModuleCode = baseConfig.module_code;
 
-    let currentOptions = {};
-    if (existingLayout.options) {
-      if (typeof existingLayout.options === 'string') {
-        try { currentOptions = JSON.parse(existingLayout.options); } catch (e) { currentOptions = {}; }
-      } else if (typeof existingLayout.options === 'object') {
-        currentOptions = existingLayout.options;
-      }
-    }
+    let existingField = await Field.findOne({
+      include: [{
+        model: SectionArea,
+        as: 'parentArea',
+        required: true,
+        include: [{
+          model: Section,
+          as: 'parentSection',
+          required: true,
+          where: { config_code: identifier }
+        }]
+      }],
+      where: { key: targetKey },
+      transaction: t
+    });
+
+    const targetSectionName = field.section_name ? String(field.section_name).trim() : 'General Information';
+    const targetAreaName = field.area_name ? String(field.area_name).trim() : 'Main Group';
 
     if (field.is_delete === true || field.is_delete === 'true') {
+      if (!existingField) throw new AppError(`Target field layout not found for key '${targetKey}'.`, 404);
+      if (!existingField.is_active) continue; 
+
+      const currentOptions = existingField.options || {};
       if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
         throw new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403);
       }
 
       historyPayloads.push({
         config_code: identifier,
-        client_code: existingLayout.client_code,
-        module_code: existingLayout.module_code,
-        key: existingLayout.key,
-        action_type: 'SINGLE_FIELD_DELETE',
+        client_code: currentClientCode,
+        module_code: currentModuleCode,
+        key: existingField.key,
+        action_type: 'SINGLE_FIELD_DISABLE',
         archived_options: currentOptions,
         archived_meta: {
-          label: existingLayout.label,
-          type: existingLayout.type,
-          is_required: existingLayout.is_required,
-          length: existingLayout.length,
-          section_name: existingLayout.section_name,
-          section_order: existingLayout.section_order,
-          area_name: existingLayout.area_name,
-          area_order: existingLayout.area_order,
-          field_order: existingLayout.field_order
+          label: existingField.label,
+          type: existingField.type,
+          is_required: existingField.is_required,
+          length: existingField.length,
+          section_name: existingField.parentArea?.parentSection?.section_name,
+          section_order: existingField.parentArea?.parentSection?.section_order,
+          area_name: existingField.parentArea?.area_name,
+          area_order: existingField.parentArea?.area_order,
+          field_order: existingField.field_order
         }
       });
 
       keysToPurge.push(targetKey);
 
-      const updatedOptions = { ...currentOptions, is_deleted_field: true };
-      await FormConfig.update(
-        { options: updatedOptions }, 
-        { where: { config_code: identifier, key: targetKey }, transaction: t }
-      );
+      await existingField.update({ is_active: false }, { transaction: t });
+      fieldsAffectedAreas.add(existingField.area_code);
       continue; 
     }
+    
+    let [sectionRecord] = await Section.findOrCreate({
+      where: { config_code: identifier, section_name: targetSectionName },
+      defaults: { section_order: safeInt(field.section_order, 1), is_active: true },
+      transaction: t
+    });
+    if (!sectionRecord.is_active) await sectionRecord.update({ is_active: true }, { transaction: t });
 
-    let currentType = field.type ? String(field.type).trim() : existingLayout.type;
-    const normalizedType = currentType.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let [areaRecord] = await SectionArea.findOrCreate({
+      where: { section_code: sectionRecord.section_code, area_name: targetAreaName },
+      defaults: { area_order: safeInt(field.area_order, 1), is_active: true },
+      transaction: t
+    });
+    if (!areaRecord.is_active) await areaRecord.update({ is_active: true }, { transaction: t });
 
-    const isCurrentlyDeleted = currentOptions.is_deleted_field === true || currentOptions.is_deleted_field === 'true';
-    if (isCurrentlyDeleted) {
-      currentOptions.is_deleted_field = false;
-    }
+    const normalizedType = (field.type ? String(field.type).trim() : (existingField ? existingField.type : 'singleline'))
+      .toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    if (field.options && typeof field.options === 'object') {
-      currentOptions = {
-        is_multiple: field.options.is_multiple !== undefined 
-          ? (field.options.is_multiple === true || field.options.is_multiple === 'true') 
-          : !!currentOptions.is_multiple,
-        can_delete: field.options.can_delete !== undefined 
-          ? (field.options.can_delete === true || field.options.can_delete === 'true') 
-          : (currentOptions.can_delete !== undefined ? currentOptions.can_delete : true),
-        value: Array.isArray(field.options.value) 
-          ? field.options.value.map(o => String(o).trim()) 
-          : (currentOptions.value || []),
-        thousand_separator: field.options.thousand_separator !== undefined 
-          ? String(field.options.thousand_separator) 
-          : (currentOptions.thousand_separator || ','),
-        decimal_separator: field.options.decimal_separator !== undefined 
-          ? String(field.options.decimal_separator) 
-          : (currentOptions.decimal_separator || '.')
-      };
-    }
-
-    await FormConfig.update({
-      label: field.label ? String(field.label).trim() : existingLayout.label,
-      type: currentType,
+    const fieldPayload = {
+      area_code: areaRecord.area_code,
+      label: field.label ? String(field.label).trim() : (existingField ? existingField.label : 'Untitled Field'),
+      type: field.type ? String(field.type).trim() : (existingField ? existingField.type : 'singleline'),
       is_required: field.is_required !== undefined 
         ? (field.is_required === true || field.is_required === 'true') 
-        : existingLayout.is_required,
-      length: ['date', 'datetime'].includes(normalizedType) ? null : (safeInt(field.length, existingLayout.length)),
-      options: currentOptions,
-      
-      section_name: field.section_name ? String(field.section_name).trim() : existingLayout.section_name,
-      section_order: safeInt(field.section_order, existingLayout.section_order),
-      area_name: field.area_name ? String(field.area_name).trim() : existingLayout.area_name,
-      area_order: safeInt(field.area_order, existingLayout.area_order),
-      field_order: safeInt(field.field_order, existingLayout.field_order)
-    }, { where: { config_code: identifier, key: targetKey }, transaction: t });
+        : (existingField ? existingField.is_required : false),
+      length: ['date', 'datetime'].includes(normalizedType) 
+        ? null 
+        : (field.length !== undefined ? safeInt(field.length, null) : (existingField ? existingField.length : null)),
+      options: field.options || (existingField ? existingField.options : {}),
+      field_order: safeInt(field.field_order, existingField ? existingField.field_order : 1),
+      is_active: true 
+    };
+
+    if (existingField) {
+      if (existingField.area_code !== areaRecord.area_code) {
+        fieldsAffectedAreas.add(existingField.area_code);
+      }
+      await existingField.update(fieldPayload, { transaction: t });
+    } else {
+      await Field.create({
+        field_code: uuidv4(),
+        key: targetKey,
+        ...fieldPayload
+      }, { transaction: t });
+    }
+    fieldsAffectedAreas.add(areaRecord.area_code);
+  }
+
+  for (const areaCode of fieldsAffectedAreas) {
+    const activeFields = await Field.findAll({
+      where: { area_code: areaCode, is_active: true },
+      order: [['field_order', 'ASC']],
+      transaction: t
+    });
+    for (let j = 0; j < activeFields.length; j++) {
+      await activeFields[j].update({ field_order: j + 1 }, { transaction: t });
+    }
   }
 
   if (keysToPurge.length > 0 && currentClientCode) {
     await DeleteHistory.bulkCreate(historyPayloads, { transaction: t });
-    await Form.update(
+
+    const postgresKeysFormattedArray = keysToPurge.map(k => `'${k.replace(/'/g, "''")}'`).join(', ');
+    await FormDataSubmission.update(
       { 
-        custom_values: sequelize.literal(`custom_values - CAST(ARRAY[:keysToPurge] AS text[])`) 
+        custom_values: sequelize.literal(`custom_values - CAST(ARRAY[${postgresKeysFormattedArray}] AS text[])`) 
       },
       { 
         where: { 
-          client_code: currentClientCode,
-          module_code: currentModuleCode
+          client_code: currentClientCode
         }, 
-        replacements: { keysToPurge }, 
         transaction: t 
       }
     );
   }
-  return { message: "Form configuration updated successfully.", config_code: identifier };
+  return { message: "Form layout properties and field configuration specifications synchronized successfully.", config_code: identifier };
 };

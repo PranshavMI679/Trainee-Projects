@@ -2,15 +2,15 @@ const express = require('express');
 const router = express.Router();
 
 const validator = require('../middleware/validator');
-const { configSchema, layoutReorderSchema } = require('../validations/config.validation');
-const { getClientLayout, processConfigLayout, deleteFieldFromLayout, updateFormLayoutStructure } = require('../controllers/configController');
+const { configSchema , layoutReorderSchema } = require('../validations/form_config.validation');
+const { getCombinedClientLayout, processConfigLayout, swapLayoutPositions, disableLayoutElement } = require('../controllers/configController');
 
-router.get('/:module_code/client-layout', getClientLayout);
+router.get('/combined-layout/:client_code', getCombinedClientLayout);
 
-router.post('/:identifier/process', validator(configSchema), processConfigLayout);
+router.post('/:client_code/process', validator(configSchema), processConfigLayout);
 
-router.patch('/:config_code/reorder', validator(layoutReorderSchema), updateFormLayoutStructure);
+router.patch('/:config_code/swap-sorting', validator(layoutReorderSchema), swapLayoutPositions);
 
-router.delete('/:config_code/delete', deleteFieldFromLayout);
+router.delete('/:config_code/disable', disableLayoutElement);
 
 module.exports = router;

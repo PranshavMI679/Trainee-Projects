@@ -145,7 +145,7 @@ const configSchema = Joi.object({
     .required()
     .messages({
       'array.base': ErrorMessages.VALIDATION.FIELD_ARRAY_BASE,
-      'any.required': ErrorMessages.FIELD_ARRAY_BASE,
+      'any.required': ErrorMessages.VALIDATION.FIELD_ARRAY_BASE,
       'array.min': ErrorMessages.VALIDATION.FIELD_ARRAY_MIN,
       'array.unique': 'Duplicate field key values are explicitly prohibited within the configuration array.'
     })

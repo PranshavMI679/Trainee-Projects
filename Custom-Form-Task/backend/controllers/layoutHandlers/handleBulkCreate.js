@@ -1,55 +1,80 @@
-const { FormConfig } = require('../../models');
+const { FormConfig, Section, SectionArea, Field } = require('../../models');
 const AppError = require('../../utils/appError');
 const { v4: uuidv4 } = require('uuid');
 
+const safeInt = (value, fallbackValue) => {
+  if (value === undefined || value === null) return fallbackValue;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) || parsed < 1 ? fallbackValue : parsed;
+};
+
 module.exports = async (targetModule, fields, t) => {
   if (!fields || !Array.isArray(fields) || fields.length === 0) {
-    throw new AppError("Fields payload must be a non-empty array.", 400);
+    throw new AppError("Fields payload configuration array must be a valid, non-empty list.", 400);
   }
 
   const unifiedFormConfigCode = uuidv4();
-  
-  const bulkInsertPayload = fields.map(field => {
-    if (!field.key || !field.label || !field.type) {
-      throw new AppError("Each field structure must possess a valid key, label, and type.", 400);
+  const uniqueSectionNames = [...new Set(fields.map(f => f.section_name ? f.section_name.trim() : 'General Information'))];
+  const sectionLookups = {};
+
+  for (const name of uniqueSectionNames) {
+    const matchingField = fields.find(f => (f.section_name ? f.section_name.trim() : 'General Information') === name);
+    const orderIndex = safeInt(matchingField ? matchingField.section_order : 1, 1);
+
+    const [sectionRow] = await Section.findOrCreate({
+      where: { config_code: unifiedFormConfigCode, section_name: name },
+      defaults: { section_order: orderIndex, is_active: true },
+      transaction: t
+    });
+    
+    sectionLookups[name] = sectionRow.section_code;
+  }
+
+  const areaLookups = {};
+
+  for (const field of fields) {
+    const secName = field.section_name ? field.section_name.trim() : 'General Information';
+    const areaName = field.area_name ? field.area_name.trim() : 'Main Group';
+    const targetSectionCode = sectionLookups[secName];
+    const compositeAreaLookupKey = `${targetSectionCode}_${areaName}`;
+
+    if (!areaLookups[compositeAreaLookupKey]) {
+      const orderIndex = safeInt(field.area_order, 1);
+      
+      const [areaRow] = await SectionArea.findOrCreate({
+        where: { section_code: targetSectionCode, area_name: areaName },
+        defaults: { area_order: orderIndex, is_active: true },
+        transaction: t
+      });
+      
+      areaLookups[compositeAreaLookupKey] = areaRow.area_code;
     }
+  }
 
+  const bulkInsertPayload = fields.map(field => {
+    const secName = field.section_name ? field.section_name.trim() : 'General Information';
+    const areaName = field.area_name ? field.area_name.trim() : 'Main Group';
+    const targetSectionCode = sectionLookups[secName];
+    const targetAreaCode = areaLookups[`${targetSectionCode}_${areaName}`];
     const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const targetCanDelete = field.options && field.options.can_delete !== undefined 
-      ? (field.options.can_delete === true || field.options.can_delete === 'true') 
-      : true;
-
-    const processedOptions = {
-      is_multiple: field.options ? (field.options.is_multiple === true || field.options.is_multiple === 'true') : false,
-      can_delete: targetCanDelete,
-      is_deleted_field: false,
-      value: field.options && Array.isArray(field.options.value) ? field.options.value.map(o => String(o).trim()) : [],
-      thousand_separator: field.options && field.options.thousand_separator !== undefined ? String(field.options.thousand_separator) : ',',
-      decimal_separator: field.options && field.options.decimal_separator !== undefined ? String(field.options.decimal_separator) : '.'
-    };
 
     return {
-      config_code: unifiedFormConfigCode,
-      client_code: targetModule.client_code,
-      module_code: targetModule.module_code,
+      field_code: uuidv4(),
+      area_code: targetAreaCode,
       key: field.key.trim(),
       label: field.label.trim(),
       type: field.type.trim(),
       is_required: field.is_required === true || field.is_required === 'true',
       length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null),
-      options: processedOptions,
-      section_name: field.section_name ? field.section_name.trim() : 'General Information',
-      section_order: parseInt(field.section_order, 10) || 1,
-      area_name: field.area_name ? field.area_name.trim() : 'Main Group',
-      area_order: parseInt(field.area_order, 10) || 1,
-      field_order: parseInt(field.field_order, 10) || 1
+      options: field.options || {},
+      field_order: safeInt(field.field_order, 1),
+      is_active: true
     };
   });
 
-  await FormConfig.bulkCreate(bulkInsertPayload, { transaction: t });
-  
+  await Field.bulkCreate(bulkInsertPayload, { transaction: t });
   return { 
-    message: "Form configuration fields registered and bound to module successfully.", 
+    message: "Dynamic multi-module structural template components compiled and built successfully.", 
     config_code: unifiedFormConfigCode, 
     status: 201 
   };

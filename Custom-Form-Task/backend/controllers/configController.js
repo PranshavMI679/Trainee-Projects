@@ -1,87 +1,61 @@
-const { Client, Module, FormConfig, DeleteHistory, Form, sequelize } = require('../models');
+const { sequelize, Client, Module, FormConfig, Section, SectionArea, Field, DeleteHistory } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
 
-const isFieldDeleted = (fieldItem) => {
-  let opts = {};
-  if (fieldItem.options) {
-    if (typeof fieldItem.options === 'string') {
-      try { opts = JSON.parse(fieldItem.options); } catch (e) {}
-    } else if (typeof fieldItem.options === 'object') {
-      opts = fieldItem.options;
-    }
-  }
-  return opts.is_deleted_field === true || 
-         opts.is_deleted_field === 'true' || 
-         opts.is_delete === true || 
-         opts.is_delete === 'true';
+const safeInt = (value, fallbackValue) => {
+  if (value === undefined || value === null) return fallbackValue;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) || parsed < 1 ? fallbackValue : parsed;
 };
 
-exports.getClientLayout = async (req, res, next) => {
+exports.getCombinedClientLayout = async (req, res, next) => {
   try {
-    const { module_code } = req.params;
-
-    const targetModule = await Module.findOne({ where: { module_code } });
-    if (!targetModule) {
-      return next(new AppError("The target application workspace module was not found.", 404));
+    const { client_code } = req.params;
+    const targetClient = await Client.findOne({ where: { client_code } });
+    if (!targetClient) {
+      return next(new AppError(ErrorMessages.CLIENT.NOT_FOUND, 404));
     }
 
-    const allLayouts = await FormConfig.findAll({ 
-      where: { module_code: targetModule.module_code },
-      order: [
-        ['section_order', 'ASC'],
-        ['area_order', 'ASC'],
-        ['field_order', 'ASC']
+    const activeLayoutConfigs = await FormConfig.findAll({
+      where: { client_code },
+      include: [
+        {
+          model: Section,
+          as: 'sections',
+          where: { is_active: true }, 
+          required: false,
+          include: [
+            {
+              model: SectionArea,
+              as: 'areas',
+              where: { is_active: true },
+              required: false,
+              include: [
+                {
+                  model: Field,
+                  as: 'fields',
+                  where: { is_active: true },
+                  required: false
+                }
+              ]
+            }
+          ]
+        }
       ],
-      raw: true 
+      order: [
+        ['created_at', 'DESC'],
+        [{ model: Section, as: 'sections' }, 'section_order', 'ASC'],
+        [{ model: Section, as: 'sections' }, { model: SectionArea, as: 'areas' }, 'area_order', 'ASC'],
+        [{ model: Section, as: 'sections' }, { model: SectionArea, as: 'areas' }, { model: Field, as: 'fields' }, 'field_order', 'ASC']
+      ]
     });
 
-    const sectionsMap = [];
-    for (let i = 0; i < allLayouts.length; i++) {
-      const layout = allLayouts[i];
-      
-      if (!isFieldDeleted(layout)) {
-        let section = sectionsMap.find(s => s.section_name === layout.section_name);
-        if (!section) {
-          section = {
-            section_name: layout.section_name,
-            section_order: layout.section_order || 1,
-            section_areas: []
-          };
-          sectionsMap.push(section);
-        }
-
-        let area = section.section_areas.find(a => a.area_name === layout.area_name);
-        if (!area) {
-          area = {
-            area_name: layout.area_name,
-            area_order: layout.area_order || 1,
-            fields: []
-          };
-          section.section_areas.push(area);
-        }
-
-        area.fields.push({
-          config_code: layout.config_code,
-          key: layout.key,
-          label: layout.label,
-          type: layout.type,
-          is_required: layout.is_required,
-          length: layout.length,
-          field_order: layout.field_order || 1,
-          options: layout.options 
-        });
-      }
-    }
-
     return res.status(200).json({
-      status: 'success',
+      success: true,
       data: {
-        client_code: targetModule.client_code,
-        module_code: targetModule.module_code,
-        module_name: targetModule.module_name,
-        sections_count: sectionsMap.length,
-        sections: sectionsMap
+        client_code: targetClient.client_code,
+        client_name: targetClient.client_name,
+        configurations: activeLayoutConfigs
       }
     });
   } catch (error) {
@@ -92,193 +66,257 @@ exports.getClientLayout = async (req, res, next) => {
 exports.processConfigLayout = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { identifier } = req.params; 
-    const { fields } = req.body; 
+    const { client_code } = req.params;
+    const { module_code, config_name, fields } = req.body;
 
-    let result;
-    const targetModule = await Module.findOne({ where: { module_code: identifier }, transaction: t });
-
-    if (targetModule) {
-      const handleBulkCreate = require('./layoutHandlers/handleBulkCreate');
-      result = await handleBulkCreate(targetModule, fields, t);
-    } else {
-      const handleFieldUpdates = require('./layoutHandlers/handleFieldUpdates');
-      result = await handleFieldUpdates(identifier, req.body, t);
+    const targetModule = await Module.findOne({ where: { module_code, client_code }, transaction: t });
+    if (!targetModule) {
+      return next(new AppError("Target application module was not found under this client context.", 404));
     }
 
-    await t.commit();
-    return res.status(result.status || 200).json({
-      status: 'success',
-      message: result.message,
-      data: {
-        config_code: result.config_code || identifier
-      }
+    let [configRecord] = await FormConfig.findOrCreate({
+      where: { client_code, module_code },
+      defaults: { config_name: config_name.trim() },
+      transaction: t
     });
 
-  } catch (error) {
-    try { await t.rollback(); } catch (e) {}
-    return next(error);
-  }
-};
-
-exports.updateFormLayoutStructure = async (req, res, next) => {
-  const t = await sequelize.transaction();
-  try {
-    const { config_code } = req.params;
-    const { fields } = req.body; 
-
-    if (!fields || !Array.isArray(fields) || fields.length === 0) {
-      await t.rollback();
-      return next(new AppError("Reordering payload data must contain a valid, non-empty array list of structural coordinate updates.", 400));
+    if (configRecord.config_name !== config_name.trim()) {
+      await configRecord.update({ config_name: config_name.trim() }, { transaction: t });
     }
 
-    for (const field of fields) {
-      const targetKey = field.key ? String(field.key).trim() : '';
-      if (!targetKey) continue;
+    const config_code = configRecord.config_code;
 
-      const existingRow = await FormConfig.findOne({
-        where: { config_code, key: targetKey },
-        attributes: ['section_name', 'section_order', 'area_name', 'area_order', 'field_order'],
+    for (const field of fields) {
+      const targetKey = field.key.trim();
+
+      let existingField = await Field.findOne({
+        include: [{
+          model: SectionArea,
+          as: 'parentArea',
+          required: true,
+          include: [{
+            model: Section,
+            as: 'parentSection',
+            required: true,
+            where: { config_code }
+          }]
+        }],
+        where: { key: targetKey },
         transaction: t
       });
 
-      if (!existingRow) {
-        await t.rollback();
-        return next(new AppError(`Target configuration layout line item row not found for identifier field key: '${targetKey}'`, 404));
+      const sectionName = field.section_name ? field.section_name.trim() : 'General Information';
+      const areaName = field.area_name ? field.area_name.trim() : 'Main Group';
+
+      let [sectionRecord] = await Section.findOrCreate({
+        where: { config_code, section_name: sectionName },
+        defaults: { section_order: safeInt(field.section_order, 1), is_active: true },
+        transaction: t
+      });
+
+      if (!sectionRecord.is_active) {
+        await sectionRecord.update({ is_active: true }, { transaction: t });
       }
 
-      const finalSectionName = field.section_name !== undefined ? String(field.section_name).trim() : existingRow.section_name;
-      const finalAreaName = field.area_name !== undefined ? String(field.area_name).trim() : existingRow.area_name;
-      
-      const finalSectionOrder = field.section_order !== undefined ? parseInt(field.section_order, 10) : existingRow.section_order;
-      const finalAreaOrder = field.area_order !== undefined ? parseInt(field.area_order, 10) : existingRow.area_order;
-      const finalFieldOrder = field.field_order !== undefined ? parseInt(field.field_order, 10) : existingRow.field_order;
-
-      await FormConfig.update({
-        section_name: finalSectionName,
-        section_order: finalSectionOrder,
-        area_name: finalAreaName,
-        area_order: finalAreaOrder,
-        field_order: finalFieldOrder
-      }, {
-        where: { config_code, key: targetKey },
-        transaction: t,
-        hooks: false,             
-        individualHooks: false    
+      let [areaRecord] = await SectionArea.findOrCreate({
+        where: { section_code: sectionRecord.section_code, area_name: areaName },
+        defaults: { area_order: safeInt(field.area_order, 1), is_active: true },
+        transaction: t
       });
+
+      if (!areaRecord.is_active) {
+        await areaRecord.update({ is_active: true }, { transaction: t });
+      }
+
+      const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const fieldPayload = {
+        area_code: areaRecord.area_code,
+        label: field.label.trim(),
+        type: field.type.trim(),
+        is_required: field.is_required === true || field.is_required === 'true',
+        length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null),
+        options: field.options || {},
+        field_order: safeInt(field.field_order, 1),
+        is_active: true 
+      };
+
+      if (existingField) {
+        await existingField.update(fieldPayload, { transaction: t });
+      } else {
+        await Field.create({
+          key: targetKey,
+          ...fieldPayload
+        }, { transaction: t });
+      }
     }
+
     await t.commit();
     return res.status(200).json({
-      status: 'success',
-      message: "Form structural layout transformations and sorting order parameters applied successfully."
+      success: true,
+      message: "Dynamic configuration forms blueprint state successfully captured and synchronized.",
+      config_code
     });
-  } 
-  catch (error) {
-    try { await t.rollback(); } catch (err) {}
+  } catch (error) {
+    await t.rollback();
     return next(error);
   }
 };
 
-exports.deleteFieldFromLayout = async (req, res, next) => {
+exports.swapLayoutPositions = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
     const { config_code } = req.params;
-    
-    const targetType = req.body.type ? String(req.body.type).trim().toUpperCase() : 'FIELD';
-    const targetKey = req.body.key ? String(req.body.key).trim() : '';
+    const { target_layer, shifts } = req.body; 
 
-    if (targetType === 'SECTION' || targetType === 'AREA') {
-      const mockBody = {
-        target_type: targetType,
-        section_name: req.body.section_name,
-        area_name: req.body.area_name
-      };
-
-      const handleBulkDelete = require('./layoutHandlers/handleBulkDelete');
-      const result = await handleBulkDelete(config_code, mockBody, t);
-      await t.commit();
-      
-      return res.status(200).json({
-        status: 'success',
-        message: result.message
-      });
-    }
-
-    if (!targetKey) {
+    if (!shifts || !Array.isArray(shifts) || shifts.length === 0) {
       await t.rollback();
-      return next(new AppError("A field profile identity 'key' parameter is required in the body block for single field deletions.", 400));
+      return next(new AppError("Swapping sequence requires an array list coordinate object set.", 400));
     }
 
-    const existingLayout = await FormConfig.findOne({ 
-      where: { config_code, key: targetKey }, 
-      transaction: t 
-    });
-
-    if (!existingLayout) {
-      await t.rollback();
-      return next(new AppError(`The specified field element key '${targetKey}' was not found.`, 404));
-    }
-
-    let currentOptions = {};
-    if (existingLayout.options) {
-      if (typeof existingLayout.options === 'string') {
-        try { currentOptions = JSON.parse(existingLayout.options); } catch (e) { currentOptions = {}; }
-      } else if (typeof existingLayout.options === 'object') {
-        currentOptions = existingLayout.options;
+    for (const shift of shifts) {
+      if (target_layer === 'SECTION') {
+        await Section.update(
+          { section_order: safeInt(shift.order_index, 1) },
+          { where: { config_code, section_code: shift.code_identifier }, transaction: t }
+        );
+      } 
+      else if (target_layer === 'AREA') {
+        await SectionArea.update(
+          { area_order: safeInt(shift.order_index, 1) },
+          { where: { area_code: shift.code_identifier }, transaction: t }
+        );
+      } 
+      else if (target_layer === 'FIELD') {
+        await Field.update(
+          { field_order: safeInt(shift.order_index, 1) },
+          { where: { field_code: shift.code_identifier }, transaction: t }
+        );
       }
     }
-    
-    if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
-      await t.rollback();
-      return next(new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403));
-    }
-
-    const updatedOptions = { ...currentOptions, is_deleted_field: true };
-
-    await DeleteHistory.create({
-      config_code: existingLayout.config_code,
-      client_code: existingLayout.client_code,
-      module_code: existingLayout.module_code,
-      key: existingLayout.key,
-      action_type: 'SINGLE_FIELD_SOFT_DELETE',
-      archived_options: currentOptions, 
-      archived_meta: {
-        label: existingLayout.label,
-        type: existingLayout.type,
-        is_required: existingLayout.is_required,
-        length: existingLayout.length,
-        section_name: existingLayout.section_name,
-        section_order: existingLayout.section_order,
-        area_name: existingLayout.area_name,
-        area_order: existingLayout.area_order,
-        field_order: existingLayout.field_order
-      }
-    }, { transaction: t });
-
-    await FormConfig.update(
-      { options: updatedOptions },
-      { where: { config_code, key: targetKey }, transaction: t }
-    );
-
-    await Form.update(
-      { custom_values: sequelize.literal(`custom_values - '${targetKey}'`) },
-      { 
-        where: { 
-          client_code: existingLayout.client_code, 
-          module_code: existingLayout.module_code 
-        }, 
-        transaction: t 
-      }
-    );
 
     await t.commit();
     return res.status(200).json({
-      status: 'success',
-      message: `Form field element key '${targetKey}' was successfully soft-deleted, logged to history, and removed from active profiles.`
+      success: true,
+      message: `Positional grid layout swaps applied successfully across your ${target_layer.toLowerCase()} structural layers.`
     });
-  } 
-  catch (error) {
-    try { await t.rollback(); } catch (rollbackErr) {}
+  } catch (error) {
+    await t.rollback();
     return next(error);
   }
 };
+
+exports.disableLayoutElement = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  try {
+    const { config_code } = req.params;
+    const { target_layer, target_code } = req.body; 
+
+    const baseConfig = await FormConfig.findOne({ where: { config_code }, transaction: t });
+    if (!baseConfig) {
+      await t.rollback();
+      return next(new AppError("Master template definition context trace failed.", 404));
+    }
+
+    let archiveFields = [];
+    let parentContextCode = null;
+
+    if (target_layer === 'SECTION') {
+      const targetSection = await Section.findOne({
+        where: { config_code, section_code: target_code },
+        include: [{ model: SectionArea, as: 'areas', include: [{ model: Field, as: 'fields' }] }],
+        transaction: t
+      });
+      if (!targetSection) throw new AppError("Section record missing.", 404);
+
+      parentContextCode = config_code;
+
+      await Section.update({ is_active: false }, { where: { section_code: target_code }, transaction: t });
+      
+      if (targetSection.areas) {
+        const areaCodes = targetSection.areas.map(a => a.area_code);
+        await SectionArea.update({ is_active: false }, { where: { area_code: areaCodes }, transaction: t });
+        
+        targetSection.areas.forEach(a => {
+          if (a.fields) archiveFields.push(...a.fields);
+        });
+      }
+    }
+    else if (target_layer === 'AREA') {
+      const targetArea = await SectionArea.findOne({
+        where: { area_code: target_code },
+        include: [{ model: Field, as: 'fields' }],
+        transaction: t
+      });
+      if (!targetArea) throw new AppError("Section area target missing.", 404);
+
+      parentContextCode = targetArea.section_code;
+
+      await SectionArea.update({ is_active: false }, { where: { area_code: target_code }, transaction: t });
+      if (targetArea.fields) archiveFields.push(...targetArea.fields);
+    }
+    else if (target_layer === 'FIELD') {
+      const targetField = await Field.findOne({ where: { field_code: target_code }, transaction: t });
+      if (!targetField) throw new AppError("Field layout component target missing.", 404);
+
+      parentContextCode = targetField.area_code;
+      archiveFields.push(targetField);
+    }
+
+    if (archiveFields.length > 0) {
+      const activeFieldCodes = archiveFields.map(f => f.field_code);
+      await Field.update({ is_active: false }, { where: { field_code: activeFieldCodes }, transaction: t });
+
+      const historyEntries = archiveFields.map(f => ({
+        config_code: baseConfig.config_code,
+        client_code: baseConfig.client_code,
+        module_code: baseConfig.module_code,
+        key: f.key,
+        action_type: `CASCADING_${target_layer}_DISABLE`,
+        archived_options: f.options || {},
+        archived_meta: { label: f.label, type: f.type, is_required: f.is_required, length: f.length }
+      }));
+      await DeleteHistory.bulkCreate(historyEntries, { transaction: t });
+    }
+
+    if (target_layer === 'SECTION') {
+      const activeItems = await Section.findAll({
+        where: { config_code: parentContextCode, is_active: true },
+        order: [['section_order', 'ASC']],
+        transaction: t
+      });
+      for (let i = 0; i < activeItems.length; i++) {
+        await activeItems[i].update({ section_order: i + 1 }, { transaction: t });
+      }
+    } 
+    else if (target_layer === 'AREA') {
+      const activeItems = await SectionArea.findAll({
+        where: { section_code: parentContextCode, is_active: true },
+        order: [['area_order', 'ASC']],
+        transaction: t
+      });
+      for (let i = 0; i < activeItems.length; i++) {
+        await activeItems[i].update({ area_order: i + 1 }, { transaction: t });
+      }
+    } 
+    else if (target_layer === 'FIELD') {
+      const activeItems = await Field.findAll({
+        where: { area_code: parentContextCode, is_active: true },
+        order: [['field_order', 'ASC']],
+        transaction: t
+      });
+      for (let i = 0; i < activeItems.length; i++) {
+        await activeItems[i].update({ field_order: i + 1 }, { transaction: t });
+      }
+    }
+
+    await t.commit();
+    return res.status(200).json({
+      success: true,
+      message: `The dynamic structural ${target_layer.toLowerCase()} segment has been safely deactivated and structural sequence paths seamlessly re-sorted.`
+    });
+  } catch (error) {
+    await t.rollback();
+    return next(error);
+  }
+};
+
