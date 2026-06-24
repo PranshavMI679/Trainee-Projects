@@ -17,7 +17,6 @@ const Section = sequelize.define('Section', {
   config_code: {
     type: DataTypes.UUID,
     allowNull: false,
-    comment: 'Links directly to the master form layout configuration'
   },
   section_name: {
     type: DataTypes.STRING(100),

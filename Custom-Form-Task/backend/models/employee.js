@@ -13,12 +13,10 @@ const Employee = sequelize.define('Employee', {
     defaultValue: DataTypes.UUIDV4,
     allowNull: false,
     unique: true,
-    comment: 'The permanent global tracking identifier for a single human user'
   },
   client_code: {
     type: DataTypes.UUID,
     allowNull: false,
-    comment: 'Links the employee to their respective corporate client tenant workspace'
   }
 }, {
   tableName: 'employees',

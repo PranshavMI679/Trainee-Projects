@@ -11,17 +11,14 @@ const FormConfig = sequelize.define('FormConfig', {
   client_code: {
     type: DataTypes.UUID, 
     allowNull: false,
-    comment: 'Relational anchor linking this configuration back to a specific corporate account'
   },
   module_code: {
     type: DataTypes.UUID, 
     allowNull: false,
-    comment: 'Relational anchor linking this layout configuration directly to a parent workspace feature'
   },
   config_name: {
     type: DataTypes.STRING(100),
     allowNull: false,
-    defaultValue: 'Unified Configuration Layout'
   }
 }, {
   tableName: 'form_configurations', 

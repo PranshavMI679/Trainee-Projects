@@ -1,11 +1,13 @@
-'use strict';
+'use FILE_STRUCTURE';
+
 module.exports = {
-  up: async (queryInterface, Sequelize) => {
+  async up(queryInterface, Sequelize) {
     await queryInterface.createTable('clients', {
       client_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
+        allowNull: false
       },
       client_code: {
         type: Sequelize.UUID,
@@ -26,9 +28,9 @@ module.exports = {
         allowNull: false
       }
     });
-    await queryInterface.addIndex('clients', ['client_code'], { name: 'idx_clients_secure_lookup' });
   },
-  down: async (queryInterface) => {
+
+  async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('clients');
   }
 };

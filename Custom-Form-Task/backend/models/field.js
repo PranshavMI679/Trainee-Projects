@@ -17,22 +17,18 @@ const Field = sequelize.define('Field', {
   area_code: {
     type: DataTypes.UUID,
     allowNull: false,
-    comment: 'Relational anchor linking this input field directly to its parent Section Area layout grid'
   },
   key: {
     type: DataTypes.STRING(100),
     allowNull: false,
-    comment: 'Database variable identifier key name (e.g., first_name, allocated_budget)'
   },
   label: {
     type: DataTypes.STRING(100),
     allowNull: false,
-    comment: 'The interface display string label text presented to the client user'
   },
   type: {
     type: DataTypes.STRING(50),
     allowNull: false,
-    comment: 'Interface element datatype (e.g., Single Line, Dropdown, Checkbox)'
   },
   is_required: {
     type: DataTypes.BOOLEAN,
@@ -47,7 +43,6 @@ const Field = sequelize.define('Field', {
     type: DataTypes.JSONB,
     allowNull: true,
     defaultValue: null,
-    comment: 'Stores option selections lists or custom configuration metadata arrays'
   },
   field_order: {
     type: DataTypes.INTEGER,

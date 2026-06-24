@@ -112,11 +112,29 @@ const singleFieldSchema = Joi.object({
 });
 
 const configSchema = Joi.object({
-  client_name: Joi.string()
+  client_code: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .required()
+    .messages({
+      'string.guid': ErrorMessages.CLIENT.INVALID_UUID,
+      'any.required': ErrorMessages.CLIENT.CODE_REQUIRED
+    }),
+
+  module_code: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .required()
+    .messages({
+      'string.guid': ErrorMessages.VALIDATION.UUID_INVALID,
+      'any.required': ErrorMessages.VALIDATION.MODULE_CODE_REQUIRED
+    }),
+
+  config_name: Joi.string()
     .trim()
     .max(100)
-    .optional()
+    .required()
     .messages({
+      'string.empty': ErrorMessages.VALIDATION.CONFIG_NAME_REQUIRED,
+      'any.required': ErrorMessages.VALIDATION.CONFIG_NAME_REQUIRED,
       'string.max': ErrorMessages.VALIDATION.CLIENT_NAME_TOO_LONG
     }),
 
@@ -127,7 +145,7 @@ const configSchema = Joi.object({
     .required()
     .messages({
       'array.base': ErrorMessages.VALIDATION.FIELD_ARRAY_BASE,
-      'any.required': ErrorMessages.VALIDATION.FIELD_ARRAY_BASE,
+      'any.required': ErrorMessages.FIELD_ARRAY_BASE,
       'array.min': ErrorMessages.VALIDATION.FIELD_ARRAY_MIN,
       'array.unique': 'Duplicate field key values are explicitly prohibited within the configuration array.'
     })
@@ -229,8 +247,19 @@ const layoutReorderSchema = Joi.object({
     })
 });
 
+const validateParams = Joi.object({
+  config_code: Joi.string()
+    .uuid({ version: 'uuidv4' })
+    .required()
+    .messages({
+      'string.guid': ErrorMessages.CLIENT.INVALID_UUID,
+      'any.required': ErrorMessages.VALIDATION.CONFIG_CODE_REQUIRED
+    })
+});
+
 module.exports = { 
   configSchema,
   editFieldSchema,
-  layoutReorderSchema 
+  layoutReorderSchema,
+  validateParams
 };

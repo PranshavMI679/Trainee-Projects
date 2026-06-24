@@ -24,6 +24,15 @@ const ErrorMessages = {
     CONFIG_CODE_REQUIRED: "config_code is required in the parameters.",
     CUSTOM_VALUES_INVALID: "custom_values must be a valid data object structure.",
 
+    UUID_INVALID: "Invalid unique identifier code format.",
+    MODULE_CODE_REQUIRED: "module_code is required in the parameters.",
+    CONFIG_NAME_REQUIRED: "Configuration name is required.",
+
+    SECTION_NAME_REQUIRED: "Section name is required.",
+    SECTION_ORDER_INVALID: "Section order must be a valid integer number.",
+    AREA_NAME_REQUIRED: "Area name is required.",
+    AREA_ORDER_INVALID: "Area order must be a valid integer number.",
+
     FIELD_ARRAY_BASE: "Fields parameters must be provided inside a structured list array.",
     FIELD_ARRAY_MIN: "You must configure at least one dynamic column field parameter row.",
     
@@ -38,7 +47,8 @@ const ErrorMessages = {
     FIELD_REQUIRED_FLAG_INVALID: "is_required parameter must be a valid boolean.",
     
     FIELD_LENGTH_BASE: "Length constraint must be a valid number.",
-    FIELD_LENGTH_INTEGER: "Length constraint must be an integer value."
+    FIELD_LENGTH_INTEGER: "Length constraint must be an integer value.",
+    FIELD_ORDER_INVALID: "Field sequence order must be a valid integer number."
   },
   
   SERVER: {

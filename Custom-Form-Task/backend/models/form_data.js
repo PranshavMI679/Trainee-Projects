@@ -14,10 +14,6 @@ const FormDataSubmission = sequelize.define('FormDataSubmission', {
   },
   client_code: {
     type: DataTypes.UUID, 
-    allowNull: false
-  },
-  config_code: {
-    type: DataTypes.UUID,
     allowNull: false,
   },
   custom_values: {
@@ -33,7 +29,7 @@ const FormDataSubmission = sequelize.define('FormDataSubmission', {
   indexes: [
     {
       name: 'idx_submissions_secure_identity_lookup',
-      fields: ['client_code', 'config_code', 'employee_code']
+      fields: ['client_code', 'employee_code']
     },
     {
       name: 'idx_submissions_custom_values_gin',

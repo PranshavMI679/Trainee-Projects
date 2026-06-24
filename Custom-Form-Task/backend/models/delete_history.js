@@ -10,7 +10,7 @@ const DeleteHistory = sequelize.define('DeleteHistory', {
   },
   config_code: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true, 
   },
   client_code: {
     type: DataTypes.UUID,
@@ -18,7 +18,7 @@ const DeleteHistory = sequelize.define('DeleteHistory', {
   },
   module_code: {
     type: DataTypes.UUID,
-    allowNull: false
+    allowNull: true 
   },
   key: {
     type: DataTypes.STRING(100),
