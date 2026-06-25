@@ -1,7 +1,13 @@
 const { sequelize, Client, Employee, Module, FormConfig, Section, SectionArea, Field, FormDataSubmission } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
-//const crypto = require('crypto');
+const crypto = require('crypto');
+
+const safeInt = (value, fallbackValue) => {
+  if (value === undefined || value === null) return fallbackValue;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) || parsed < 1 ? fallbackValue : parsed;
+};
 
 exports.getModuleLayout = async (req, res, next) => {
   try {
@@ -21,17 +27,14 @@ exports.getModuleLayout = async (req, res, next) => {
       include: [{
         model: Section,
         as: 'sections',
-        where: { is_active: true },
         required: false,
         include: [{
           model: SectionArea,
           as: 'areas',
-          where: { is_active: true },
           required: false,
           include: [{
             model: Field,
             as: 'fields',
-            where: { is_active: true },
             required: false
           }]
         }]
@@ -43,13 +46,47 @@ exports.getModuleLayout = async (req, res, next) => {
       ]
     });
 
+    let filteredLayout = null;
+    if (moduleConfig) {
+      const configJson = moduleConfig.toJSON();
+      const activeSections = [];
+
+      for (const sec of configJson.sections || []) {
+        if (sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
+        const activeAreas = [];
+
+        for (const ar of sec.areas || []) {
+          if (ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
+
+          const activeFields = (ar.fields || []).filter(f => {
+            const opts = f.options || {};
+            return !(
+              opts.is_field_deleted === true || opts.is_field_deleted === 'true' ||
+              opts.is_deleted === true || opts.is_deleted === 'true' ||
+              opts.is_deleted_field === true || opts.is_deleted_field === 'true'
+            );
+          });
+
+          if (activeFields.length > 0) {
+            activeAreas.push({ ...ar, fields: activeFields });
+          }
+        }
+
+        if (activeAreas.length > 0) {
+          activeSections.push({ ...sec, areas: activeAreas });
+        }
+      }
+      configJson.sections = activeSections;
+      filteredLayout = configJson;
+    }
+
     return res.status(200).json({
       success: true,
       data: {
         client_name: targetModule.clientWorkspace?.client_name || "Unknown Tenant",
         module_name: targetModule.module_name,
         module_code: targetModule.module_code,
-        layout: moduleConfig || null
+        layout: filteredLayout
       }
     });
   } catch (error) {
@@ -71,17 +108,14 @@ exports.getCombinedFormLayout = async (req, res, next) => {
       include: [{
         model: Section,
         as: 'sections',
-        where: { is_active: true },
         required: false,
         include: [{
           model: SectionArea,
           as: 'areas',
-          where: { is_active: true },
           required: false,
           include: [{
             model: Field,
             as: 'fields',
-            where: { is_active: true },
             required: false
           }]
         }]
@@ -93,13 +127,48 @@ exports.getCombinedFormLayout = async (req, res, next) => {
         [{ model: Section, as: 'sections' }, { model: SectionArea, as: 'areas' }, { model: Field, as: 'fields' }, 'field_order', 'ASC']
       ]
     });
+    const filteredTemplates = [];
+
+    for (const config of combinedLayouts) {
+      const configJson = config.toJSON();
+      const activeSections = [];
+
+      for (const sec of configJson.sections || []) {
+        if (sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
+        const activeAreas = [];
+
+        for (const ar of sec.areas || []) {
+          if (ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
+
+          const activeFields = (ar.fields || []).filter(f => {
+            const opts = f.options || {};
+            return !(
+              opts.is_field_deleted === true || opts.is_field_deleted === 'true' ||
+              opts.is_deleted === true || opts.is_deleted === 'true' ||
+              opts.is_deleted_field === true || opts.is_deleted_field === 'true'
+            );
+          });
+
+          if (activeFields.length > 0) {
+            activeAreas.push({ ...ar, fields: activeFields });
+          }
+        }
+
+        if (activeAreas.length > 0) {
+          activeSections.push({ ...sec, areas: activeAreas });
+        }
+      }
+
+      configJson.sections = activeSections;
+      filteredTemplates.push(configJson);
+    }
 
     return res.status(200).json({
       success: true,
       data: {
         client_name: targetClient.client_name,
         client_code: targetClient.client_code,
-        form_templates: combinedLayouts
+        form_templates: filteredTemplates
       }
     });
   } catch (error) {
@@ -111,29 +180,37 @@ exports.getEmployeeCombinedDetails = async (req, res, next) => {
   try {
     const { employee_code } = req.params;
 
-    const employee = await Employee.findOne({ where: { employee_code: employee_code.trim() } });
-    if (!employee) {
-      return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
+    if (!employee_code || String(employee_code).trim() === "") {
+      return next(new AppError(ErrorMessages.FORM.CODE_REQUIRED || "Employee lookup tracking identifier is required.", 400));
     }
 
     const submission = await FormDataSubmission.findOne({
-      where: { employee_code: employee.employee_code, client_code: employee.client_code }
+      where: { employee_code: String(employee_code).trim() },
+      include: [{
+        model: Client,
+        as: 'submittingClient',
+        attributes: ['client_name']
+      }]
     });
 
+    if (!submission) {
+      return next(new AppError(ErrorMessages.FORM.RECORD_NOT_FOUND, 404));
+    }
+
     const activeConfigs = await FormConfig.findAll({
-      where: { client_code: employee.client_code },
+      where: { client_code: submission.client_code },
       include: [{
         model: Section,
         as: 'sections',
-        where: { is_active: true },
+        required: false,
         include: [{
           model: SectionArea,
           as: 'areas',
-          where: { is_active: true },
+          required: false,
           include: [{
             model: Field,
             as: 'fields',
-            where: { is_active: true }
+            required: false
           }]
         }]
       }]
@@ -143,17 +220,23 @@ exports.getEmployeeCombinedDetails = async (req, res, next) => {
     for (const config of activeConfigs) {
       if (!config.sections) continue;
       for (const sec of config.sections) {
+        if (sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
         if (!sec.areas) continue;
         for (const ar of sec.areas) {
+          if (ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
           if (!ar.fields) continue;
           for (const f of ar.fields) {
+            const opts = f.options || {};
+            const isDeleted = opts.is_field_deleted === true || opts.is_deleted === true || opts.is_deleted_field === true;
+            if (isDeleted) continue;
+            
             activeKeysDictionary[f.key] = { label: f.label, type: f.type };
           }
         }
       }
     }
 
-    const userValues = submission ? { ...submission.custom_values } : {};
+    const userValues = submission.custom_values ? { ...submission.custom_values } : {};
     const finalizedOutputConfigPayload = {};
 
     Object.keys(activeKeysDictionary).forEach(key => {
@@ -166,11 +249,13 @@ exports.getEmployeeCombinedDetails = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
+      message: "Employee multi-module dynamic profile details successfully retrieved.",
       data: {
-        employee_code: employee.employee_code,
-        client_code: employee.client_code,
-        submission_id: submission ? submission.submission_id : null,
-        updated_at: submission ? submission.updated_at : null,
+        employee_code: submission.employee_code,
+        client_code: submission.client_code,
+        client_name: submission.submittingClient?.client_name || "Unknown Tenant",
+        submission_id: submission.submission_id,
+        updated_at: submission.updated_at,
         combined_profile_data: finalizedOutputConfigPayload
       }
     });
