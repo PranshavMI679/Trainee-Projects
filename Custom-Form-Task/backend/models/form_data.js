@@ -14,6 +14,7 @@ const FormDataSubmission = sequelize.define('FormDataSubmission', {
   },
   client_code: {
     type: DataTypes.UUID, 
+    defaultValue: DataTypes.UUIDV4,
     allowNull: false,
   },
   custom_values: {

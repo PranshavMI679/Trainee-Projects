@@ -2,21 +2,13 @@ const Joi = require('joi');
 const ErrorMessages = require('../utils/errorMessages');
 
 const formDataValidationSchemas = {
-  createSubmission: Joi.object({
-    client_code: Joi.string()
-      .uuid({ version: 'uuidv4' })
-      .required()
-      .messages({
-        'string.guid': ErrorMessages.CLIENT.INVALID_UUID,
-        'any.required': ErrorMessages.CLIENT.CODE_REQUIRED
-      }),
-
+  createSubmission: Joi.object({    
     employee_code: Joi.string()
       .uuid({ version: 'uuidv4' })
-      .required()
+      .optional() 
+      .allow('', null)
       .messages({
-        'string.guid': ErrorMessages.FORM.INVALID_UUID,
-        'any.required': ErrorMessages.FORM.CODE_REQUIRED
+        'string.guid': ErrorMessages.FORM.INVALID_UUID
       }),
 
     custom_values: Joi.object()
@@ -29,12 +21,12 @@ const formDataValidationSchemas = {
   }),
 
   validateParams: Joi.object({
-    employee_code: Joi.string()
+    client_code: Joi.string()
       .uuid({ version: 'uuidv4' })
       .required()
       .messages({
-        'string.guid': ErrorMessages.FORM.INVALID_UUID,
-        'any.required': ErrorMessages.FORM.CODE_REQUIRED
+        'string.guid': ErrorMessages.CLIENT.INVALID_UUID,
+        'any.required': ErrorMessages.CLIENT.CODE_REQUIRED
       })
   }),
 

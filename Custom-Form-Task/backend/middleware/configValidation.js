@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { FormConfig, Form, Client, Module } = require('../models');
+const { FormConfig, Section, SectionArea, Field, FormDataSubmission, Client, Module } = require('../models');
 const AppError = require('../utils/appError');
 
 const REGEX_PATTERNS = {
@@ -11,105 +11,103 @@ const REGEX_PATTERNS = {
 
 const configValidation = async (req, res, next) => {
   try {
-    const { code } = req.params; 
-    let lookupIdentifier = code ? String(code).trim() : null;
+    // 1. Resolve client_code safely from request parameter boundaries
+    const { client_code } = req.params; 
+    let lookupIdentifier = client_code ? String(client_code).trim() : null;
     const { custom_values } = req.body;
 
     if (!lookupIdentifier) {
       return next(new AppError("A validation tracking identifier path parameter is strictly required.", 400));
     }
 
-    let allRules = [];
+    let baseConfigs = [];
+    
+    // 2. Resolve Master Configuration contexts cleanly by parsing incoming identifiers
     if (lookupIdentifier.toUpperCase().startsWith('EMP')) {
-      const employeeRecord = await Form.findOne({ where: { employee_code: lookupIdentifier.toUpperCase() } });
+      const employeeRecord = await FormDataSubmission.findOne({ where: { employee_code: lookupIdentifier } });
       if (employeeRecord) {
-        allRules = await FormConfig.findAll({ 
+        baseConfigs = await FormConfig.findAll({ 
           where: { 
             client_code: employeeRecord.client_code,
             module_code: employeeRecord.module_code 
-          },
-          order: [
-            ['created_at', 'DESC'],
-            ['section_order', 'ASC'],
-            ['area_order', 'ASC'],
-            ['field_order', 'ASC']
-          ]
+          }
         });
       }
     } else {
       const targetModule = await Module.findOne({ where: { module_code: lookupIdentifier } });
 
       if (targetModule) {
-        allRules = await FormConfig.findAll({ 
-          where: { module_code: targetModule.module_code },
-          order: [
-            ['created_at', 'DESC'],
-            ['section_order', 'ASC'],
-            ['area_order', 'ASC'],
-            ['field_order', 'ASC']
-          ]
-        });
+        baseConfigs = await FormConfig.findAll({ where: { module_code: targetModule.module_code } });
       } else {
         const targetClient = await Client.findOne({ where: { client_code: lookupIdentifier } });
 
         if (targetClient) {
-          allRules = await FormConfig.findAll({ 
-            where: { client_code: targetClient.client_code },
-            order: [
-              ['created_at', 'DESC'],
-              ['section_order', 'ASC'],
-              ['area_order', 'ASC'],
-              ['field_order', 'ASC']
-            ]
-          });
+          baseConfigs = await FormConfig.findAll({ where: { client_code: targetClient.client_code } });
         } else {
-          allRules = await FormConfig.findAll({ 
-            where: { config_code: lookupIdentifier },
-            order: [
-              ['created_at', 'DESC'],
-              ['section_order', 'ASC'],
-              ['area_order', 'ASC'],
-              ['field_order', 'ASC']
-            ]
-          });
+          baseConfigs = await FormConfig.findAll({ where: { config_code: lookupIdentifier } });
         }
       }
     }
 
-    if (allRules.length === 0 && req.body.config_code) {
-      allRules = await FormConfig.findAll({ 
-        where: { config_code: String(req.body.config_code).trim() },
-        order: [
-          ['created_at', 'DESC'],
-          ['section_order', 'ASC'],
-          ['area_order', 'ASC'],
-          ['field_order', 'ASC']
-        ]
-      });
+    if (baseConfigs.length === 0 && req.body.config_code) {
+      baseConfigs = await FormConfig.findAll({ where: { config_code: String(req.body.config_code).trim() } });
     }
 
+    if (baseConfigs.length === 0) {
+      return next(new AppError("Validation configuration block could not be resolved. Ensure the module code, client code, or config UUID is active and registered in your database.", 400));
+    }
+
+    // 3. Resolve the actual underlying field tree by utilizing cascade associations
+    const configCodes = baseConfigs.map(c => c.config_code);
+    const sections = await Section.findAll({
+      where: { config_code: configCodes },
+      order: [
+        ['section_order', 'ASC'],
+        [{ model: SectionArea, as: 'areas' }, 'area_order', 'ASC'],
+        [{ model: SectionArea, as: 'areas' }, { model: Field, as: 'fields' }, 'field_order', 'ASC']
+      ],
+      include: [{
+        model: SectionArea,
+        as: 'areas',
+        include: [{
+          model: Field,
+          as: 'fields'
+        }]
+      }]
+    });
+
+    // 4. Flatten and filter active fields out of cascading tree structures
     const rules = [];
     const observedKeys = new Set();
 
-    for (let i = 0; i < allRules.length; i++) {
-      const currentRule = allRules[i];
-      if (!currentRule.key || observedKeys.has(currentRule.key)) continue;
+    for (const sec of sections) {
+      if (sec.options?.is_delete === true) continue;
+      
+      for (const ar of sec.areas || []) {
+        if (ar.options?.is_delete === true) continue;
 
-      const opts = currentRule.options || {};
-      const isDeletedField = opts.is_deleted_field === true || 
-                             opts.is_deleted_field === 'true' ||
-                             opts.is_delete === true || 
-                             opts.is_delete === 'true';
-      if (!isDeletedField) {
-        observedKeys.add(currentRule.key);
-        rules.push(currentRule);
+        for (const f of ar.fields || []) {
+          const opts = f.options || {};
+          const isDeletedField = opts.is_deleted_field === true || 
+                                 opts.is_deleted_field === 'true' ||
+                                 opts.is_delete === true || 
+                                 opts.is_delete === 'true' ||
+                                 opts.is_field_deleted === true ||
+                                 opts.is_field_deleted === 'true';
+          
+          if (!isDeletedField && f.key && !observedKeys.has(f.key)) {
+            observedKeys.add(f.key);
+            rules.push(f);
+          }
+        }
       }
     }
 
     if (rules.length === 0) {
-      return next(new AppError("Validation configuration block could not be resolved. Ensure the module code, client code, or config UUID is active and registered in your database.", 400));
+      return next(new AppError("Validation layout rules could not be calculated. No active input structural fields exist within the targeted workspace.", 400));
     }
 
+    // 5. Build Dynamic Joi Schema Configuration matrix
     const dynamicJoiRules = {};
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i];

@@ -218,18 +218,51 @@ const structuralFieldSchema = Joi.object({
   field_order: Joi.number().strict().integer().min(1).optional()    
 });
 
-const layoutReorderSchema = Joi.object({
-  fields: Joi.array()
-    .items(structuralFieldSchema)
+// Schema for an individual item inside the shifts array
+const shiftItemSchema = Joi.object({
+  code_identifier: Joi.string()
+    .trim()
     .min(1)
-    .unique('key') 
     .required()
     .messages({
-      'array.base': 'Reordering data payload must be passed within an array list block.',
-      'array.min': 'Provide at least one component coordinate set to execute changes.',
-      'array.unique': 'Each field key layout configuration identifier can only exist once inside the reordering shifts.'
+      'string.empty': 'Code identifier string cannot be empty.',
+      'any.required': 'Code identifier is required for structural items inside the shifts array.'
+    }),
+  order_index: Joi.number()
+    .strict()
+    .integer()
+    .min(1)
+    .required()
+    .messages({
+      'number.base': 'Order index sequence must be a numeric integer value.',
+      'number.integer': 'Order index sequence must be a whole number.',
+      'number.min': 'Order index placement values must start at 1 or greater.',
+      'any.required': 'Order index sequencing is required to commit position changes.'
     })
 });
+
+const layoutReorderSchema = Joi.object({
+  target_layer: Joi.string()
+    .trim()
+    .uppercase()
+    .valid('SECTION', 'AREA', 'FIELD')
+    .required()
+    .messages({
+      'any.only': 'Target layer configuration must be explicitly one of: SECTION, AREA, or FIELD.',
+      'any.required': 'Target structural layout layer type parameter is required.'
+    }),
+  shifts: Joi.array()
+    .items(shiftItemSchema)
+    .min(1)
+    .unique('code_identifier')
+    .required()
+    .messages({
+      'array.base': 'Reordering shifts payload must be passed within an array list block.',
+      'array.min': 'Provide at least one structural component shift item to execute positions changes.',
+      'array.unique': 'Each layout component code identifier can only exist once inside the shifts tracking array.'
+    })
+});
+
 
 const validateParams = Joi.object({
   config_code: Joi.string()

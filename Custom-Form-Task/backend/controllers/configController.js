@@ -49,11 +49,13 @@ exports.getCombinedClientLayout = async (req, res, next) => {
 
           const activeFields = fields.filter(f => {
             const opts = f.options || {};
-            const isDeletedField = opts.is_deleted_field === true || 
-                                   opts.is_deleted_field === 'true' ||
-                                   opts.is_delete === true || 
-                                   opts.is_delete === 'true';
-            return !isDeletedField;
+            
+            const isHidden = opts.is_field_deleted === true || 
+                             opts.is_field_deleted === 'true' ||
+                             opts.is_deleted === true || 
+                             opts.is_deleted === 'true';
+                             
+            return !isHidden;
           });
 
           if (activeFields.length > 0) {
@@ -139,34 +141,37 @@ exports.processConfigLayout = async (req, res, next) => {
 
       let [sectionRecord] = await Section.findOrCreate({
         where: { config_code, section_name: sectionName },
-        defaults: { section_order: safeInt(field.section_order, 1), is_active: true },
+        defaults: { section_order: safeInt(field.section_order, 1) },
         transaction: t
       });
-
-      if (!sectionRecord.is_active) {
-        await sectionRecord.update({ is_active: true }, { transaction: t });
-      }
 
       let [areaRecord] = await SectionArea.findOrCreate({
         where: { section_code: sectionRecord.section_code, area_name: areaName },
-        defaults: { area_order: safeInt(field.area_order, 1), is_active: true },
+        defaults: { area_order: safeInt(field.area_order, 1) },
         transaction: t
       });
 
-      if (!areaRecord.is_active) {
-        await areaRecord.update({ is_active: true }, { transaction: t });
+      const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      const incomingOptions = field.options || {};
+      
+      if (incomingOptions.can_delete === undefined) {
+        incomingOptions.can_delete = true;
+      } else {
+        incomingOptions.can_delete = (incomingOptions.can_delete === true || incomingOptions.can_delete === 'true');
       }
 
-      const normalizedType = field.type.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (incomingOptions.is_field_deleted !== undefined) delete incomingOptions.is_field_deleted;
+      if (incomingOptions.is_deleted !== undefined) delete incomingOptions.is_deleted;
+
       const fieldPayload = {
         area_code: areaRecord.area_code,
         label: field.label.trim(),
         type: field.type.trim(),
         is_required: field.is_required === true || field.is_required === 'true',
         length: ['date', 'datetime'].includes(normalizedType) ? null : (field.length || null),
-        options: field.options || {},
-        field_order: safeInt(field.field_order, 1),
-        is_active: true 
+        options: incomingOptions, 
+        field_order: safeInt(field.field_order, 1)
       };
 
       if (existingField) {
@@ -202,31 +207,75 @@ exports.swapLayoutPositions = async (req, res, next) => {
       return next(new AppError("Swapping sequence requires an array list coordinate object set.", 400));
     }
 
+    const uppercaseLayer = String(target_layer).toUpperCase().trim();
+    if (!['SECTION', 'AREA', 'FIELD'].includes(uppercaseLayer)) {
+      await t.rollback();
+      return next(new AppError("Invalid layout layer specified target context.", 400));
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    const targetLayerMapping = {
+      'SECTION': { model: Section, orderField: 'section_order', defaultKey: 'section_code', fallbackKey: 'section_name', useConfigCode: true },
+      'AREA': { model: SectionArea, orderField: 'area_order', defaultKey: 'area_code', fallbackKey: 'area_name', useConfigCode: false },
+      'FIELD': { model: Field, orderField: 'field_order', defaultKey: 'field_code', fallbackKey: 'key', useConfigCode: false }
+    };
+
+    const targetConfig = targetLayerMapping[uppercaseLayer];
+
     for (const shift of shifts) {
-      if (target_layer === 'SECTION') {
-        await Section.update(
-          { section_order: safeInt(shift.order_index, 1) },
-          { where: { config_code, section_code: shift.code_identifier }, transaction: t }
-        );
-      } 
-      else if (target_layer === 'AREA') {
-        await SectionArea.update(
-          { area_order: safeInt(shift.order_index, 1) },
-          { where: { area_code: shift.code_identifier }, transaction: t }
-        );
-      } 
-      else if (target_layer === 'FIELD') {
-        await Field.update(
-          { field_order: safeInt(shift.order_index, 1) },
-          { where: { field_code: shift.code_identifier }, transaction: t }
-        );
+      const targetIdentifier = String(shift.code_identifier || '').trim();
+      if (!targetIdentifier) continue;
+
+      const cleanOrderIndex = typeof safeInt === 'function'
+        ? safeInt(shift.order_index, 1)
+        : parseInt(shift.order_index, 10) || 1;
+
+      const activeLookupColumn = uuidRegex.test(targetIdentifier) 
+        ? targetConfig.defaultKey 
+        : targetConfig.fallbackKey;
+
+      const whereCondition = { [activeLookupColumn]: targetIdentifier };
+      
+      if (targetConfig.useConfigCode) {
+        whereCondition.config_code = config_code;
       }
+
+      const outOfBoundsSafeIndex = Math.abs(cleanOrderIndex) + 10000;
+
+      await targetConfig.model.update(
+        { [targetConfig.orderField]: outOfBoundsSafeIndex },
+        { where: whereCondition, transaction: t }
+      );
+    }
+
+    for (const shift of shifts) {
+      const targetIdentifier = String(shift.code_identifier || '').trim();
+      if (!targetIdentifier) continue;
+
+      const cleanOrderIndex = typeof safeInt === 'function'
+        ? safeInt(shift.order_index, 1)
+        : parseInt(shift.order_index, 10) || 1;
+
+      const activeLookupColumn = uuidRegex.test(targetIdentifier) 
+        ? targetConfig.defaultKey 
+        : targetConfig.fallbackKey;
+
+      const whereCondition = { [activeLookupColumn]: targetIdentifier };
+      if (targetConfig.useConfigCode) {
+        whereCondition.config_code = config_code;
+      }
+
+      await targetConfig.model.update(
+        { [targetConfig.orderField]: Math.abs(cleanOrderIndex) },
+        { where: whereCondition, transaction: t }
+      );
     }
 
     await t.commit();
     return res.status(200).json({
       success: true,
-      message: `Positional grid layout swaps applied successfully across your ${target_layer.toLowerCase()} structural layers.`
+      message: `Positional grid layout swaps applied successfully across your ${uppercaseLayer.toLowerCase()} structural layers.`
     });
   } catch (error) {
     await t.rollback();
@@ -246,105 +295,165 @@ exports.disableLayoutElement = async (req, res, next) => {
       return next(new AppError("Master template definition context trace failed.", 404));
     }
 
+    const uppercaseLayer = String(target_layer).toUpperCase().trim();
+    const rawTargetCode = String(target_code).trim();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     let archiveFields = [];
     let parentContextCode = null;
 
-    if (target_layer === 'SECTION') {
-      const targetSection = await Section.findOne({
-        where: { config_code, section_code: target_code },
+    if (uppercaseLayer === 'SECTION') {
+      const sectionLookupColumn = uuidRegex.test(rawTargetCode) ? 'section_code' : 'section_name';
+      
+      const targetSectionInstance = await Section.findOne({
+        where: { config_code, [sectionLookupColumn]: rawTargetCode },
         include: [{ model: SectionArea, as: 'areas', include: [{ model: Field, as: 'fields' }] }],
         transaction: t
       });
-      if (!targetSection) throw new AppError("Section record missing.", 404);
+      if (!targetSectionInstance) throw new AppError("Section record missing.", 404);
 
+      const targetSection = targetSectionInstance.get({ plain: true });
       parentContextCode = config_code;
-
-      await Section.update({ is_active: false }, { where: { section_code: target_code }, transaction: t });
       
       if (targetSection.areas) {
-        const areaCodes = targetSection.areas.map(a => a.area_code);
-        await SectionArea.update({ is_active: false }, { where: { area_code: areaCodes }, transaction: t });
-        
-        targetSection.areas.forEach(a => {
-          if (a.fields) archiveFields.push(...a.fields);
+        targetSection.areas.forEach(area => {
+          if (area.fields) archiveFields.push(...area.fields);
         });
       }
     }
-    else if (target_layer === 'AREA') {
-      const targetArea = await SectionArea.findOne({
-        where: { area_code: target_code },
+    else if (uppercaseLayer === 'AREA') {
+      const areaLookupColumn = uuidRegex.test(rawTargetCode) ? 'area_code' : 'area_name';
+
+      const targetAreaInstance = await SectionArea.findOne({
+        where: { [areaLookupColumn]: rawTargetCode },
         include: [{ model: Field, as: 'fields' }],
         transaction: t
       });
-      if (!targetArea) throw new AppError("Section area target missing.", 404);
+      if (!targetAreaInstance) throw new AppError("Section area target missing.", 404);
 
+      const targetArea = targetAreaInstance.get({ plain: true });
       parentContextCode = targetArea.section_code;
-
-      await SectionArea.update({ is_active: false }, { where: { area_code: target_code }, transaction: t });
+      
       if (targetArea.fields) archiveFields.push(...targetArea.fields);
     }
-    else if (target_layer === 'FIELD') {
-      const targetField = await Field.findOne({ where: { field_code: target_code }, transaction: t });
-      if (!targetField) throw new AppError("Field layout component target missing.", 404);
+    else if (uppercaseLayer === 'FIELD') {
+      const fieldLookupColumn = uuidRegex.test(rawTargetCode) ? 'field_code' : 'key';
 
+      const targetFieldInstance = await Field.findOne({ 
+        where: { [fieldLookupColumn]: rawTargetCode }, 
+        transaction: t 
+      });
+      if (!targetFieldInstance) throw new AppError("Field layout component target missing.", 404);
+
+      const targetField = targetFieldInstance.get({ plain: true });
       parentContextCode = targetField.area_code;
       archiveFields.push(targetField);
     }
 
     if (archiveFields.length > 0) {
-      const activeFieldCodes = archiveFields.map(f => f.field_code);
-      await Field.update({ is_active: false }, { where: { field_code: activeFieldCodes }, transaction: t });
+      const fieldsToSaveToLog = [];
 
-      const historyEntries = archiveFields.map(f => ({
-        config_code: baseConfig.config_code,
-        client_code: baseConfig.client_code,
-        module_code: baseConfig.module_code,
-        key: f.key,
-        action_type: `CASCADING_${target_layer}_DISABLE`,
-        archived_options: f.options || {},
-        archived_meta: { label: f.label, type: f.type, is_required: f.is_required, length: f.length }
-      }));
-      await DeleteHistory.bulkCreate(historyEntries, { transaction: t });
+      for (const field of archiveFields) {
+        const currentOptions = field.options || {};
+        
+        if (uppercaseLayer === 'FIELD' && currentOptions.can_delete === false) {
+          await t.rollback();
+          return next(new AppError(`The field element '${field.label}' is protected and cannot be deleted.`, 400));
+        }
+
+        if (currentOptions.can_delete === false) continue;
+
+        if (uppercaseLayer === 'FIELD') {
+          currentOptions.is_field_deleted = true;
+        } else {
+          currentOptions.is_deleted = true;
+        }
+
+        await Field.update(
+          { options: currentOptions },
+          { where: { field_code: field.field_code }, transaction: t }
+        );
+        fieldsToSaveToLog.push(field);
+      }
+
+      if (fieldsToSaveToLog.length > 0) {
+        const historyEntries = fieldsToSaveToLog.map(f => ({
+          config_code: baseConfig.config_code,
+          client_code: baseConfig.client_code,
+          module_code: baseConfig.module_code,
+          key: f.key,
+          action_type: `CASCADING_${uppercaseLayer}_DISABLE`,
+          archived_options: f.options || {},
+          archived_meta: { label: f.label, type: f.type, is_required: f.is_required, length: f.length }
+        }));
+        await DeleteHistory.bulkCreate(historyEntries, { transaction: t });
+      }
     }
 
-    if (target_layer === 'SECTION') {
-      const activeItems = await Section.findAll({
-        where: { config_code: parentContextCode, is_active: true },
+    if (uppercaseLayer === 'SECTION') {
+      const allSections = await Section.findAll({
+        where: { config_code: parentContextCode },
+        include: [{ model: SectionArea, as: 'areas', include: [{ model: Field, as: 'fields' }] }],
         order: [['section_order', 'ASC']],
         transaction: t
       });
-      for (let i = 0; i < activeItems.length; i++) {
-        await activeItems[i].update({ section_order: i + 1 }, { transaction: t });
+
+      let currentOrder = 1;
+      for (const secInstance of allSections) {
+        const sec = secInstance.get({ plain: true });
+        let totalFields = 0;
+        let deletedFieldsCount = 0;
+
+        (sec.areas || []).forEach(a => {
+          (a.fields || []).forEach(f => { totalFields++; if (f.options?.is_deleted || f.options?.is_field_deleted) deletedFieldsCount++; });
+        });
+
+        if (totalFields > 0 && totalFields === deletedFieldsCount) continue; 
+        await secInstance.update({ section_order: currentOrder++ }, { transaction: t });
       }
     } 
-    else if (target_layer === 'AREA') {
-      const activeItems = await SectionArea.findAll({
-        where: { section_code: parentContextCode, is_active: true },
+    else if (uppercaseLayer === 'AREA') {
+      const allAreas = await SectionArea.findAll({
+        where: { section_code: parentContextCode },
+        include: [{ model: Field, as: 'fields' }],
         order: [['area_order', 'ASC']],
         transaction: t
       });
-      for (let i = 0; i < activeItems.length; i++) {
-        await activeItems[i].update({ area_order: i + 1 }, { transaction: t });
+
+      let currentOrder = 1;
+      for (const areaInstance of allAreas) {
+        const area = areaInstance.get({ plain: true });
+        let totalFields = 0;
+        let deletedFieldsCount = 0;
+
+        (area.fields || []).forEach(f => { totalFields++; if (f.options?.is_deleted || f.options?.is_field_deleted) deletedFieldsCount++; });
+
+        if (totalFields > 0 && totalFields === deletedFieldsCount) continue;
+        await areaInstance.update({ area_order: currentOrder++ }, { transaction: t });
       }
     } 
-    else if (target_layer === 'FIELD') {
-      const activeItems = await Field.findAll({
-        where: { area_code: parentContextCode, is_active: true },
+    else if (uppercaseLayer === 'FIELD') {
+      const allFields = await Field.findAll({
+        where: { area_code: parentContextCode },
         order: [['field_order', 'ASC']],
         transaction: t
       });
-      for (let i = 0; i < activeItems.length; i++) {
-        await activeItems[i].update({ field_order: i + 1 }, { transaction: t });
+
+      let currentOrder = 1;
+      for (const item of allFields) {
+        const opts = item.options || {};
+        if (opts.is_field_deleted || opts.is_deleted) continue; 
+        await item.update({ field_order: currentOrder++ }, { transaction: t });
       }
     }
 
     await t.commit();
     return res.status(200).json({
       success: true,
-      message: `The dynamic structural ${target_layer.toLowerCase()} segment has been safely deactivated and structural sequence paths seamlessly re-sorted.`
+      message: `The dynamic structural ${uppercaseLayer.toLowerCase()} segment has been safely deactivated and structural sequence paths seamlessly re-sorted.`
     });
   } catch (error) {
-    await t.rollback();
+    if (t && !t.finished) await t.rollback();
     return next(error);
   }
 };

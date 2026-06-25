@@ -1,6 +1,7 @@
 const { sequelize, Client, Employee, Module, FormConfig, Section, SectionArea, Field, FormDataSubmission } = require('../models');
 const AppError = require('../utils/appError');
 const ErrorMessages = require('../utils/errorMessages');
+//const crypto = require('crypto');
 
 exports.getModuleLayout = async (req, res, next) => {
   try {
@@ -181,65 +182,43 @@ exports.getEmployeeCombinedDetails = async (req, res, next) => {
 exports.processCombinedFormDetails = async (req, res, next) => {
   const t = await sequelize.transaction();
   try {
-    const { client_code, employee_code, custom_values } = req.body;
+    const { client_code } = req.params;
+    const { custom_values } = req.body;
 
-    let targetEmployee = await Employee.findOne({ 
-      where: { employee_code, client_code }, 
-      transaction: t 
-    });
+    const mergedCustomValues = {};
+    if (custom_values && typeof custom_values === 'object') {
+      const inputKeys = Object.keys(custom_values);
+      for (let i = 0; i < inputKeys.length; i++) {
+        const key = inputKeys[i];
+        const currentInput = custom_values[key];
 
-    if (!targetEmployee) {
-      targetEmployee = await Employee.create({
-        employee_code,
-        client_code
-      }, { transaction: t });
-    }
-
-    let submissionRow = await FormDataSubmission.findOne({
-      where: { employee_code: targetEmployee.employee_code, client_code: targetEmployee.client_code },
-      transaction: t
-    });
-
-    let mergedCustomValues = {};
-    let isNewSubmission = false;
-
-    if (!submissionRow) {
-      isNewSubmission = true;
-      mergedCustomValues = custom_values || {};
-    } else {
-      mergedCustomValues = submissionRow.custom_values ? { ...submissionRow.custom_values } : {};
-      
-      if (custom_values && typeof custom_values === 'object') {
-        const inputKeys = Object.keys(custom_values);
-        for (let i = 0; i < inputKeys.length; i++) {
-          const key = inputKeys[i];
-          const currentInput = custom_values[key];
-
-          if (currentInput === null || currentInput === undefined || (typeof currentInput === 'string' && currentInput.trim() === "")) {
-            delete mergedCustomValues[key];
-          } else {
-            mergedCustomValues[key] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
-          }
+        if (currentInput !== null && currentInput !== undefined && !(typeof currentInput === 'string' && currentInput.trim() === "")) {
+          mergedCustomValues[key] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
         }
       }
     }
 
-    if (isNewSubmission) {
-      submissionRow = await FormDataSubmission.create({
-        client_code: targetEmployee.client_code,
-        employee_code: targetEmployee.employee_code,
-        custom_values: mergedCustomValues
-      }, { transaction: t });
+    let finalEmployeeCode;
+
+    if (req.body.employee_code && String(req.body.employee_code).trim() !== "") {
+      finalEmployeeCode = String(req.body.employee_code).trim();
     } else {
-      await submissionRow.update({
-        custom_values: mergedCustomValues
-      }, { transaction: t });
+      finalEmployeeCode = crypto.randomUUID();
     }
 
+    const submissionPayload = {
+      employee_code: finalEmployeeCode, 
+      client_code: String(client_code).trim(),
+      custom_values: mergedCustomValues
+    };
+
+    const submissionRow = await FormDataSubmission.create(submissionPayload, { transaction: t });
+
     await t.commit();
-    return res.status(isNewSubmission ? 201 : 200).json({
+    
+    return res.status(201).json({
       success: true,
-      message: isNewSubmission ? "Combined multi-module data entry captured successfully." : "Specific form details patched successfully.",
+      message: "Combined dynamic form details captured successfully with auto-generated identification codes.",
       data: {
         submission_id: submissionRow.submission_id,
         employee_code: submissionRow.employee_code,
@@ -248,7 +227,11 @@ exports.processCombinedFormDetails = async (req, res, next) => {
       }
     });
   } catch (error) {
-    await t.rollback();
+    if (t && !t.finished) {
+      await t.rollback();
+    }
+    console.error("FORM SUBMISSION ERROR DIAGNOSTIC:", error);
     return next(error);
   }
 };
+
