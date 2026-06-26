@@ -58,7 +58,6 @@ exports.getCombinedClientLayout = async (req, res, next) => {
                              opts.is_deleted === 'true' ||
                              opts.is_deleted_field === true || 
                              opts.is_deleted_field === 'true';
-                             
             return !isHidden;
           });
 

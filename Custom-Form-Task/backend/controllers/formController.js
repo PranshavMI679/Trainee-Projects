@@ -139,16 +139,13 @@ exports.getCombinedFormLayout = async (req, res, next) => {
       const activeSections = [];
 
       for (const sec of configJson.sections || []) {
-        // Drop section if deactivated or explicitly soft-deleted
         if (sec.is_active === false || sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
         const activeAreas = [];
 
         for (const ar of sec.areas || []) {
-          // Drop area if deactivated or explicitly soft-deleted
           if (ar.is_active === false || ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
 
           const activeFields = (ar.fields || []).filter(f => {
-            // Check structural column level activation
             if (f.is_active === false) return false;
 
             const opts = f.options || {};
