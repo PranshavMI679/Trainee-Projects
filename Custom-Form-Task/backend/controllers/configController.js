@@ -32,6 +32,8 @@ exports.getCombinedClientLayout = async (req, res, next) => {
       const structuredSections = [];
 
       for (const sec of sections) {
+        if (sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
+
         const areas = await SectionArea.findAll({
           where: { section_code: sec.section_code },
           order: [['area_order', 'ASC']],
@@ -53,7 +55,9 @@ exports.getCombinedClientLayout = async (req, res, next) => {
             const isHidden = opts.is_field_deleted === true || 
                              opts.is_field_deleted === 'true' ||
                              opts.is_deleted === true || 
-                             opts.is_deleted === 'true';
+                             opts.is_deleted === 'true' ||
+                             opts.is_deleted_field === true || 
+                             opts.is_deleted_field === 'true';
                              
             return !isHidden;
           });
@@ -161,8 +165,21 @@ exports.processConfigLayout = async (req, res, next) => {
         incomingOptions.can_delete = (incomingOptions.can_delete === true || incomingOptions.can_delete === 'true');
       }
 
-      if (incomingOptions.is_field_deleted !== undefined) delete incomingOptions.is_field_deleted;
-      if (incomingOptions.is_deleted !== undefined) delete incomingOptions.is_deleted;
+      if (existingField && existingField.options) {
+        if (existingField.options.is_field_deleted !== undefined) {
+          incomingOptions.is_field_deleted = existingField.options.is_field_deleted;
+        }
+        if (existingField.options.is_deleted !== undefined) {
+          incomingOptions.is_deleted = existingField.options.is_deleted;
+        }
+        if (existingField.options.is_deleted_field !== undefined) {
+          incomingOptions.is_deleted_field = existingField.options.is_deleted_field;
+        }
+      } else {
+        if (incomingOptions.is_field_deleted !== undefined) delete incomingOptions.is_field_deleted;
+        if (incomingOptions.is_deleted !== undefined) delete incomingOptions.is_deleted;
+        if (incomingOptions.is_deleted_field !== undefined) delete incomingOptions.is_deleted_field;
+      }
 
       const fieldPayload = {
         area_code: areaRecord.area_code,
@@ -227,6 +244,44 @@ exports.swapLayoutPositions = async (req, res, next) => {
       const targetIdentifier = String(shift.code_identifier || '').trim();
       if (!targetIdentifier) continue;
 
+      const activeLookupColumn = uuidRegex.test(targetIdentifier) 
+        ? targetConfig.defaultKey 
+        : targetConfig.fallbackKey;
+
+      const whereCondition = { [activeLookupColumn]: targetIdentifier };
+      if (targetConfig.useConfigCode) {
+        whereCondition.config_code = config_code;
+      }
+
+      const existingInstance = await targetConfig.model.findOne({ where: whereCondition, transaction: t });
+      
+      if (!existingInstance) {
+        await t.rollback();
+        return next(new AppError(`The structural layout target '${targetIdentifier}' was not found inside your workspace context.`, 404));
+      }
+
+      if (uppercaseLayer === 'SECTION' || uppercaseLayer === 'FIELD') {
+        const opts = existingInstance.options || {};
+        const isSoftDeleted = opts.is_delete === true || 
+                             opts.is_delete === 'true' || 
+                             opts.is_field_deleted === true || 
+                             opts.is_field_deleted === 'true' || 
+                             opts.is_deleted === true || 
+                             opts.is_deleted === 'true' || 
+                             opts.is_deleted_field === true || 
+                             opts.is_deleted_field === 'true';
+
+        if (isSoftDeleted) {
+          await t.rollback();
+          return next(new AppError(`Operation rejected: The layout ${uppercaseLayer.toLowerCase()} component '${targetIdentifier}' has been deleted and cannot be reordered.`, 400));
+        }
+      }
+    }
+
+    for (const shift of shifts) {
+      const targetIdentifier = String(shift.code_identifier || '').trim();
+      if (!targetIdentifier) continue;
+
       const cleanOrderIndex = typeof safeInt === 'function'
         ? safeInt(shift.order_index, 1)
         : parseInt(shift.order_index, 10) || 1;
@@ -236,7 +291,6 @@ exports.swapLayoutPositions = async (req, res, next) => {
         : targetConfig.fallbackKey;
 
       const whereCondition = { [activeLookupColumn]: targetIdentifier };
-      
       if (targetConfig.useConfigCode) {
         whereCondition.config_code = config_code;
       }
@@ -278,7 +332,9 @@ exports.swapLayoutPositions = async (req, res, next) => {
       message: `Positional grid layout swaps applied successfully across your ${uppercaseLayer.toLowerCase()} structural layers.`
     });
   } catch (error) {
-    await t.rollback();
+    if (t && !t.finished) {
+      await t.rollback();
+    }
     return next(error);
   }
 };
@@ -311,6 +367,15 @@ exports.disableLayoutElement = async (req, res, next) => {
         transaction: t
       });
       if (!targetSectionInstance) throw new AppError("Section record missing.", 404);
+
+      if (targetSectionInstance.options?.is_delete === true || targetSectionInstance.options?.is_delete === 'true') {
+        await t.rollback();
+        return next(new AppError(`The layout section '${rawTargetCode}' is already deactivated or unavailable.`, 400));
+      }
+
+      const updatedSecOptions = targetSectionInstance.options || {};
+      updatedSecOptions.is_delete = true;
+      await targetSectionInstance.update({ options: updatedSecOptions }, { transaction: t });
 
       const targetSection = targetSectionInstance.get({ plain: true });
       parentContextCode = config_code;
@@ -345,6 +410,11 @@ exports.disableLayoutElement = async (req, res, next) => {
       });
       if (!targetFieldInstance) throw new AppError("Field layout component target missing.", 404);
 
+      if (targetFieldInstance.options?.is_field_deleted === true || targetFieldInstance.options?.is_deleted === true) {
+        await t.rollback();
+        return next(new AppError(`The layout field parameter '${rawTargetCode}' is already deactivated or unavailable.`, 400));
+      }
+
       const targetField = targetFieldInstance.get({ plain: true });
       parentContextCode = targetField.area_code;
       archiveFields.push(targetField);
@@ -362,6 +432,8 @@ exports.disableLayoutElement = async (req, res, next) => {
         }
 
         if (currentOptions.can_delete === false) continue;
+        
+        if (currentOptions.is_field_deleted === true || currentOptions.is_deleted === true) continue;
 
         if (uppercaseLayer === 'FIELD') {
           currentOptions.is_field_deleted = true;
@@ -393,22 +465,13 @@ exports.disableLayoutElement = async (req, res, next) => {
     if (uppercaseLayer === 'SECTION') {
       const allSections = await Section.findAll({
         where: { config_code: parentContextCode },
-        include: [{ model: SectionArea, as: 'areas', include: [{ model: Field, as: 'fields' }] }],
         order: [['section_order', 'ASC']],
         transaction: t
       });
 
       let currentOrder = 1;
       for (const secInstance of allSections) {
-        const sec = secInstance.get({ plain: true });
-        let totalFields = 0;
-        let deletedFieldsCount = 0;
-
-        (sec.areas || []).forEach(a => {
-          (a.fields || []).forEach(f => { totalFields++; if (f.options?.is_deleted || f.options?.is_field_deleted) deletedFieldsCount++; });
-        });
-
-        if (totalFields > 0 && totalFields === deletedFieldsCount) continue; 
+        if (secInstance.options?.is_delete === true || secInstance.options?.is_delete === 'true') continue;
         await secInstance.update({ section_order: currentOrder++ }, { transaction: t });
       }
     } 
@@ -422,11 +485,13 @@ exports.disableLayoutElement = async (req, res, next) => {
 
       let currentOrder = 1;
       for (const areaInstance of allAreas) {
-        const area = areaInstance.get({ plain: true });
         let totalFields = 0;
         let deletedFieldsCount = 0;
 
-        (area.fields || []).forEach(f => { totalFields++; if (f.options?.is_deleted || f.options?.is_field_deleted) deletedFieldsCount++; });
+        (areaInstance.fields || []).forEach(f => { 
+          totalFields++; 
+          if (f.options?.is_deleted || f.options?.is_field_deleted || f.options?.is_deleted_field) deletedFieldsCount++; 
+        });
 
         if (totalFields > 0 && totalFields === deletedFieldsCount) continue;
         await areaInstance.update({ area_order: currentOrder++ }, { transaction: t });
@@ -442,7 +507,7 @@ exports.disableLayoutElement = async (req, res, next) => {
       let currentOrder = 1;
       for (const item of allFields) {
         const opts = item.options || {};
-        if (opts.is_field_deleted || opts.is_deleted) continue; 
+        if (opts.is_field_deleted || opts.is_deleted || opts.is_deleted_field) continue; 
         await item.update({ field_order: currentOrder++ }, { transaction: t });
       }
     }

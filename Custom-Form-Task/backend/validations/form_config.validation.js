@@ -218,7 +218,6 @@ const structuralFieldSchema = Joi.object({
   field_order: Joi.number().strict().integer().min(1).optional()    
 });
 
-// Schema for an individual item inside the shifts array
 const shiftItemSchema = Joi.object({
   code_identifier: Joi.string()
     .trim()
@@ -251,7 +250,7 @@ const layoutReorderSchema = Joi.object({
       'any.only': 'Target layer configuration must be explicitly one of: SECTION, AREA, or FIELD.',
       'any.required': 'Target structural layout layer type parameter is required.'
     }),
-  shifts: Joi.array()
+    shifts: Joi.array()
     .items(shiftItemSchema)
     .min(1)
     .unique('code_identifier')
@@ -262,7 +261,6 @@ const layoutReorderSchema = Joi.object({
       'array.unique': 'Each layout component code identifier can only exist once inside the shifts tracking array.'
     })
 });
-
 
 const validateParams = Joi.object({
   config_code: Joi.string()

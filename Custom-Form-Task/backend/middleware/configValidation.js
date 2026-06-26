@@ -11,7 +11,6 @@ const REGEX_PATTERNS = {
 
 const configValidation = async (req, res, next) => {
   try {
-    // 1. Resolve client_code safely from request parameter boundaries
     const { client_code } = req.params; 
     let lookupIdentifier = client_code ? String(client_code).trim() : null;
     const { custom_values } = req.body;
@@ -20,9 +19,12 @@ const configValidation = async (req, res, next) => {
       return next(new AppError("A validation tracking identifier path parameter is strictly required.", 400));
     }
 
+    if (!custom_values || typeof custom_values !== 'object') {
+      return next(new AppError("The request body must contain a valid 'custom_values' object.", 400));
+    }
+
     let baseConfigs = [];
     
-    // 2. Resolve Master Configuration contexts cleanly by parsing incoming identifiers
     if (lookupIdentifier.toUpperCase().startsWith('EMP')) {
       const employeeRecord = await FormDataSubmission.findOne({ where: { employee_code: lookupIdentifier } });
       if (employeeRecord) {
@@ -57,7 +59,6 @@ const configValidation = async (req, res, next) => {
       return next(new AppError("Validation configuration block could not be resolved. Ensure the module code, client code, or config UUID is active and registered in your database.", 400));
     }
 
-    // 3. Resolve the actual underlying field tree by utilizing cascade associations
     const configCodes = baseConfigs.map(c => c.config_code);
     const sections = await Section.findAll({
       where: { config_code: configCodes },
@@ -76,30 +77,50 @@ const configValidation = async (req, res, next) => {
       }]
     });
 
-    // 4. Flatten and filter active fields out of cascading tree structures
     const rules = [];
-    const observedKeys = new Set();
+    const activeKeysSet = new Set();
+    const deletedKeysSet = new Set();
 
     for (const sec of sections) {
-      if (sec.options?.is_delete === true) continue;
+      const isSectionDeleted = sec.options?.is_delete === true || sec.options?.is_delete === 'true';
       
       for (const ar of sec.areas || []) {
-        if (ar.options?.is_delete === true) continue;
+        const isAreaDeleted = isSectionDeleted;
 
         for (const f of ar.fields || []) {
           const opts = f.options || {};
-          const isDeletedField = opts.is_deleted_field === true || 
+          
+          const isFieldDeleted = isAreaDeleted ||
+                                 opts.is_deleted_field === true || 
                                  opts.is_deleted_field === 'true' ||
                                  opts.is_delete === true || 
                                  opts.is_delete === 'true' ||
                                  opts.is_field_deleted === true ||
                                  opts.is_field_deleted === 'true';
           
-          if (!isDeletedField && f.key && !observedKeys.has(f.key)) {
-            observedKeys.add(f.key);
-            rules.push(f);
+          if (f.key) {
+            const cleanKey = f.key.trim();
+            if (isFieldDeleted) {
+              deletedKeysSet.add(cleanKey);
+            } else {
+              activeKeysSet.add(cleanKey);
+              rules.push(f);
+            }
           }
         }
+      }
+    }
+
+    const inputKeys = Object.keys(custom_values || {});
+    for (const inputKey of inputKeys) {
+      const cleanInputKey = inputKey.trim();
+      
+      if (deletedKeysSet.has(cleanInputKey)) {
+        return next(new AppError(`The field element '${inputKey}' is no longer active or available for data entry submissions.`, 400));
+      }
+      
+      if (!activeKeysSet.has(cleanInputKey)) {
+        return next(new AppError(`The input parameter '${inputKey}' is not configured or available for this workspace context.`, 400));
       }
     }
 
@@ -107,7 +128,6 @@ const configValidation = async (req, res, next) => {
       return next(new AppError("Validation layout rules could not be calculated. No active input structural fields exist within the targeted workspace.", 400));
     }
 
-    // 5. Build Dynamic Joi Schema Configuration matrix
     const dynamicJoiRules = {};
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i];
@@ -214,13 +234,14 @@ const configValidation = async (req, res, next) => {
           joiFieldSchema = joiFieldSchema.optional().allow('', null);
         }
       }
+      
       dynamicJoiRules[rule.key] = joiFieldSchema;
     }
 
-    const compiledSchema = Joi.object(dynamicJoiRules).unknown(true);
+    const compiledSchema = Joi.object(dynamicJoiRules).unknown(false);
     const { error, value } = compiledSchema.validate(custom_values || {}, {
       abortEarly: false,
-      stripUnknown: false  
+      stripUnknown: true
     });
 
     if (error) {
@@ -240,3 +261,4 @@ const configValidation = async (req, res, next) => {
 };
 
 module.exports = configValidation;
+

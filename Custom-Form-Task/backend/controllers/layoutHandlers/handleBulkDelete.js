@@ -14,34 +14,39 @@ module.exports = async (identifier, body, t) => {
     const trimmedSectionName = String(section_name).trim();
 
     const targetSection = await Section.findOne({
-      where: { config_code: identifier, section_name: trimmedSectionName, is_active: true },
+      where: { config_code: identifier, section_name: trimmedSectionName },
       include: [{ 
         model: SectionArea, 
         as: 'areas', 
-        where: { is_active: true },
         required: false,
         include: [{ 
           model: Field, 
           as: 'fields', 
-          where: { is_active: true },
           required: false 
         }] 
       }],
       transaction: t
     });
 
-    if (!targetSection) throw new AppError(`No active section named '${trimmedSectionName}' was found in this layout configuration.`, 404);
+    if (!targetSection || targetSection.options?.is_delete === true || targetSection.options?.is_delete === 'true') {
+      throw new AppError(`No active section named '${trimmedSectionName}' was found in this layout configuration.`, 404);
+    }
 
     parentContextCode = identifier; 
 
-    await Section.update({ is_active: false }, { where: { section_code: targetSection.section_code }, transaction: t });
+    const currentSecOptions = targetSection.options || {};
+    currentSecOptions.is_delete = true;
+    await Section.update({ options: currentSecOptions }, { where: { section_code: targetSection.section_code }, transaction: t });
     
     if (targetSection.areas && targetSection.areas.length > 0) {
-      const areaCodes = targetSection.areas.map(a => a.area_code);
-      await SectionArea.update({ is_active: false }, { where: { area_code: areaCodes }, transaction: t });
-      
       targetSection.areas.forEach(a => {
-        if (a.fields && a.fields.length > 0) archiveFields.push(...a.fields);
+        if (a.fields && a.fields.length > 0) {
+          a.fields.forEach(f => {
+            if (!f.options?.is_deleted && !f.options?.is_field_deleted) {
+              archiveFields.push(f);
+            }
+          });
+        }
       });
     }
   } 
@@ -51,73 +56,103 @@ module.exports = async (identifier, body, t) => {
     }
     const trimmedSectionName = String(section_name).trim();
     const trimmedAreaName = String(area_name).trim();
+
     const targetArea = await SectionArea.findOne({
       include: [{
         model: Section,
         as: 'parentSection',
         required: true,
-        where: { config_code: identifier, section_name: trimmedSectionName, is_active: true }
+        where: { config_code: identifier, section_name: trimmedSectionName }
       }, {
         model: Field,
         as: 'fields',
-        where: { is_active: true },
         required: false
       }],
-      where: { area_name: trimmedAreaName, is_active: true },
+      where: { area_name: trimmedAreaName },
       transaction: t
     });
 
-    if (!targetArea) {
+    if (!targetArea || targetArea.parentSection?.options?.is_delete === true || targetArea.parentSection?.options?.is_delete === 'true') {
       throw new AppError(`No active area named '${trimmedAreaName}' inside section '${trimmedSectionName}' was found in this layout configuration.`, 404);
     }
 
     parentContextCode = targetArea.section_code; 
 
-    await SectionArea.update({ is_active: false }, { where: { area_code: targetArea.area_code }, transaction: t });
-    if (targetArea.fields && targetArea.fields.length > 0) archiveFields.push(...targetArea.fields);
+    if (targetArea.fields && targetArea.fields.length > 0) {
+      targetArea.fields.forEach(f => {
+        if (!f.options?.is_deleted && !f.options?.is_field_deleted) {
+          archiveFields.push(f);
+        }
+      });
+    }
+    
+    if (archiveFields.length === 0) {
+      throw new AppError(`The layout area '${trimmedAreaName}' is already deactivated or contains no active fields.`, 404);
+    }
   } else {
     throw new AppError("Invalid target_type classification code passed. Use SECTION or AREA.", 400);
   }
 
   const processedKeys = [];
   if (archiveFields.length > 0) {
-    const activeFieldCodes = archiveFields.map(f => f.field_code);
-    
-    await Field.update({ is_active: false }, { where: { field_code: activeFieldCodes }, transaction: t });
+    for (const field of archiveFields) {
+      processedKeys.push(field.key);
+      const currentOptions = field.options || {};
+      
+      currentOptions.is_deleted = true; 
 
-    const historyEntries = archiveFields.map(f => {
-      processedKeys.push(f.key);
-      return {
-        config_code: baseConfig.config_code,
-        client_code: baseConfig.client_code,
-        module_code: baseConfig.module_code,
-        key: f.key,
-        action_type: `CASCADING_${target_type}_DISABLE`,
-        archived_options: f.options || {},
-        archived_meta: { label: f.label, type: f.type, is_required: f.is_required, length: f.length }
-      };
-    });
+      await Field.update(
+        { options: currentOptions },
+        { where: { field_code: field.field_code }, transaction: t }
+      );
+    }
+
+    const historyEntries = archiveFields.map(f => ({
+      config_code: baseConfig.config_code,
+      client_code: baseConfig.client_code,
+      module_code: baseConfig.module_code,
+      key: f.key,
+      action_type: `CASCADING_${target_type}_DISABLE`,
+      archived_options: f.options || {},
+      archived_meta: { label: f.label, type: f.type, is_required: f.is_required, length: f.length }
+    }));
     await DeleteHistory.bulkCreate(historyEntries, { transaction: t });
   }
 
   if (target_type === 'SECTION') {
-    const activeSections = await Section.findAll({
-      where: { config_code: parentContextCode, is_active: true },
+    const allSections = await Section.findAll({
+      where: { config_code: parentContextCode },
       order: [['section_order', 'ASC']],
       transaction: t
     });
-    for (let i = 0; i < activeSections.length; i++) {
-      await activeSections[i].update({ section_order: i + 1 }, { transaction: t });
+
+    let activeSequenceCounter = 1;
+    for (let i = 0; i < allSections.length; i++) {
+      const sectionInstance = allSections[i];
+      if (sectionInstance.options?.is_delete === true || sectionInstance.options?.is_delete === 'true') continue;
+      
+      await sectionInstance.update({ section_order: activeSequenceCounter++ }, { transaction: t });
     }
   } 
   else if (target_type === 'AREA') {
-    const activeAreas = await SectionArea.findAll({
-      where: { section_code: parentContextCode, is_active: true },
+    const allAreas = await SectionArea.findAll({
+      where: { section_code: parentContextCode },
+      include: [{ model: Field, as: 'fields' }],
       order: [['area_order', 'ASC']],
       transaction: t
     });
-    for (let i = 0; i < activeAreas.length; i++) {
-      await activeAreas[i].update({ area_order: i + 1 }, { transaction: t });
+
+    let activeSequenceCounter = 1;
+    for (let i = 0; i < allAreas.length; i++) {
+      const areaInstance = allAreas[i];
+      let liveFieldsCount = 0;
+      
+      (areaInstance.fields || []).forEach(f => {
+        if (!f.options?.is_deleted && !f.options?.is_field_deleted) liveFieldsCount++;
+      });
+
+      if (liveFieldsCount === 0) continue;
+      await areaInstance.update({ area_order: activeSequenceCounter++ }, { transaction: t });
     }
   }
 

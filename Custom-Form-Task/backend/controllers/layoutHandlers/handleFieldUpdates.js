@@ -70,9 +70,11 @@ module.exports = async (identifier, reqBody, t) => {
 
     if (field.is_delete === true || field.is_delete === 'true') {
       if (!existingField) throw new AppError(`Target field layout not found for key '${targetKey}'.`, 404);
-      if (!existingField.is_active) continue; 
-
+      
       const currentOptions = existingField.options || {};
+      
+      if (currentOptions.is_field_deleted === true || currentOptions.is_deleted === true) continue; 
+
       if (currentOptions.can_delete === false || currentOptions.can_delete === 'false') {
         throw new AppError(`The configuration field '${targetKey}' is locked and cannot be deleted.`, 403);
       }
@@ -99,27 +101,33 @@ module.exports = async (identifier, reqBody, t) => {
 
       keysToPurge.push(targetKey);
 
-      await existingField.update({ is_active: false }, { transaction: t });
+      currentOptions.is_field_deleted = true;
+      await existingField.update({ options: currentOptions }, { transaction: t });
+      
       fieldsAffectedAreas.add(existingField.area_code);
       continue; 
     }
     
     let [sectionRecord] = await Section.findOrCreate({
       where: { config_code: identifier, section_name: targetSectionName },
-      defaults: { section_order: safeInt(field.section_order, 1), is_active: true },
+      defaults: { section_order: safeInt(field.section_order, 1) },
       transaction: t
     });
-    if (!sectionRecord.is_active) await sectionRecord.update({ is_active: true }, { transaction: t });
 
     let [areaRecord] = await SectionArea.findOrCreate({
       where: { section_code: sectionRecord.section_code, area_name: targetAreaName },
-      defaults: { area_order: safeInt(field.area_order, 1), is_active: true },
+      defaults: { area_order: safeInt(field.area_order, 1) },
       transaction: t
     });
-    if (!areaRecord.is_active) await areaRecord.update({ is_active: true }, { transaction: t });
 
     const normalizedType = (field.type ? String(field.type).trim() : (existingField ? existingField.type : 'singleline'))
       .toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const incomingOptions = field.options || (existingField ? existingField.options : {});
+    
+    delete incomingOptions.is_field_deleted;
+    delete incomingOptions.is_deleted;
+    delete incomingOptions.is_deleted_field;
 
     const fieldPayload = {
       area_code: areaRecord.area_code,
@@ -131,9 +139,8 @@ module.exports = async (identifier, reqBody, t) => {
       length: ['date', 'datetime'].includes(normalizedType) 
         ? null 
         : (field.length !== undefined ? safeInt(field.length, null) : (existingField ? existingField.length : null)),
-      options: field.options || (existingField ? existingField.options : {}),
-      field_order: safeInt(field.field_order, existingField ? existingField.field_order : 1),
-      is_active: true 
+      options: incomingOptions,
+      field_order: safeInt(field.field_order, existingField ? existingField.field_order : 1)
     };
 
     if (existingField) {
@@ -152,13 +159,20 @@ module.exports = async (identifier, reqBody, t) => {
   }
 
   for (const areaCode of fieldsAffectedAreas) {
-    const activeFields = await Field.findAll({
-      where: { area_code: areaCode, is_active: true },
+    const allFields = await Field.findAll({
+      where: { area_code: areaCode },
       order: [['field_order', 'ASC']],
       transaction: t
     });
-    for (let j = 0; j < activeFields.length; j++) {
-      await activeFields[j].update({ field_order: j + 1 }, { transaction: t });
+    
+    let activeSequenceCounter = 1;
+    for (let j = 0; j < allFields.length; j++) {
+      const item = allFields[j];
+      const opts = item.options || {};
+      
+      if (opts.is_field_deleted || opts.is_deleted) continue; 
+      
+      await item.update({ field_order: activeSequenceCounter++ }, { transaction: t });
     }
   }
 
@@ -171,9 +185,7 @@ module.exports = async (identifier, reqBody, t) => {
         custom_values: sequelize.literal(`custom_values - CAST(ARRAY[${postgresKeysFormattedArray}] AS text[])`) 
       },
       { 
-        where: { 
-          client_code: currentClientCode
-        }, 
+        where: { client_code: currentClientCode }, 
         transaction: t 
       }
     );

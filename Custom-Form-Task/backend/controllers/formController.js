@@ -52,13 +52,18 @@ exports.getModuleLayout = async (req, res, next) => {
       const activeSections = [];
 
       for (const sec of configJson.sections || []) {
-        if (sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
+        // Drop section if deactivated or explicitly soft-deleted
+        if (sec.is_active === false || sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
         const activeAreas = [];
 
         for (const ar of sec.areas || []) {
-          if (ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
+          // Drop area if deactivated or explicitly soft-deleted
+          if (ar.is_active === false || ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
 
           const activeFields = (ar.fields || []).filter(f => {
+            // Check structural column level activation
+            if (f.is_active === false) return false;
+
             const opts = f.options || {};
             return !(
               opts.is_field_deleted === true || opts.is_field_deleted === 'true' ||
@@ -134,13 +139,18 @@ exports.getCombinedFormLayout = async (req, res, next) => {
       const activeSections = [];
 
       for (const sec of configJson.sections || []) {
-        if (sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
+        // Drop section if deactivated or explicitly soft-deleted
+        if (sec.is_active === false || sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
         const activeAreas = [];
 
         for (const ar of sec.areas || []) {
-          if (ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
+          // Drop area if deactivated or explicitly soft-deleted
+          if (ar.is_active === false || ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
 
           const activeFields = (ar.fields || []).filter(f => {
+            // Check structural column level activation
+            if (f.is_active === false) return false;
+
             const opts = f.options || {};
             return !(
               opts.is_field_deleted === true || opts.is_field_deleted === 'true' ||
@@ -220,12 +230,14 @@ exports.getEmployeeCombinedDetails = async (req, res, next) => {
     for (const config of activeConfigs) {
       if (!config.sections) continue;
       for (const sec of config.sections) {
-        if (sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
+        if (sec.is_active === false || sec.options?.is_delete === true || sec.options?.is_delete === 'true') continue;
         if (!sec.areas) continue;
         for (const ar of sec.areas) {
-          if (ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
+          if (ar.is_active === false || ar.options?.is_delete === true || ar.options?.is_delete === 'true') continue;
           if (!ar.fields) continue;
           for (const f of ar.fields) {
+            if (f.is_active === false) continue;
+            
             const opts = f.options || {};
             const isDeleted = opts.is_field_deleted === true || opts.is_deleted === true || opts.is_deleted_field === true;
             if (isDeleted) continue;
@@ -270,21 +282,88 @@ exports.processCombinedFormDetails = async (req, res, next) => {
     const { client_code } = req.params;
     const { custom_values } = req.body;
 
+    const activeConfigs = await FormConfig.findAll({
+      where: { client_code },
+      include: [{
+        model: Section,
+        as: 'sections',
+        include: [{
+          model: SectionArea,
+          as: 'areas',
+          include: [{
+            model: Field,
+            as: 'fields'
+          }]
+        }]
+      }],
+      transaction: t
+    });
+
+    const activeKeysSet = new Set();
+    const deletedKeysSet = new Set();
+
+    for (const config of activeConfigs) {
+      if (!config.sections) continue;
+      for (const sec of config.sections) {
+        const isSectionDeleted = sec.is_active === false || 
+                                 sec.options?.is_delete === true || 
+                                 sec.options?.is_delete === 'true';
+
+        if (!sec.areas) continue;
+        for (const ar of sec.areas) {
+          const isAreaDeleted = isSectionDeleted || 
+                               ar.is_active === false || 
+                               ar.options?.is_delete === true || 
+                               ar.options?.is_delete === 'true';
+
+          if (!ar.fields) continue;
+          for (const f of ar.fields) {
+            const opts = f.options || {};
+            const isFieldDeleted = isAreaDeleted ||
+                                  f.is_active === false ||
+                                  opts.is_field_deleted === true || 
+                                  opts.is_field_deleted === 'true' ||
+                                  opts.is_deleted === true || 
+                                  opts.is_deleted === 'true' ||
+                                  opts.is_deleted_field === true || 
+                                  opts.is_deleted_field === 'true';
+
+            const cleanKey = f.key.trim();
+            if (isFieldDeleted) {
+              deletedKeysSet.add(cleanKey);
+            } else {
+              activeKeysSet.add(cleanKey);
+            }
+          }
+        }
+      }
+    }
+
     const mergedCustomValues = {};
     if (custom_values && typeof custom_values === 'object') {
       const inputKeys = Object.keys(custom_values);
       for (let i = 0; i < inputKeys.length; i++) {
         const key = inputKeys[i];
+        const trimmedKey = key.trim();
         const currentInput = custom_values[key];
 
+        if (deletedKeysSet.has(trimmedKey)) {
+          await t.rollback();
+          return next(new AppError(`The field element '${key}' is no longer active or available for data entry submissions.`, 400));
+        }
+
+        if (!activeKeysSet.has(trimmedKey)) {
+          await t.rollback();
+          return next(new AppError(`The input parameter '${key}' is not configured or available for this workspace context.`, 400));
+        }
+
         if (currentInput !== null && currentInput !== undefined && !(typeof currentInput === 'string' && currentInput.trim() === "")) {
-          mergedCustomValues[key] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
+          mergedCustomValues[trimmedKey] = typeof currentInput === 'string' ? currentInput.trim() : currentInput;
         }
       }
     }
 
     let finalEmployeeCode;
-
     if (req.body.employee_code && String(req.body.employee_code).trim() !== "") {
       finalEmployeeCode = String(req.body.employee_code).trim();
     } else {
@@ -303,7 +382,7 @@ exports.processCombinedFormDetails = async (req, res, next) => {
     
     return res.status(201).json({
       success: true,
-      message: "Combined dynamic form details captured successfully with auto-generated identification codes.",
+      message: "Combined dynamic form details captured successfully with active validation checks.",
       data: {
         submission_id: submissionRow.submission_id,
         employee_code: submissionRow.employee_code,
