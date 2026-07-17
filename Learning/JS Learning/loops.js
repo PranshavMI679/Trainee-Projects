@@ -77,9 +77,9 @@
 
 // Comparing for loop with while loop
 
-const cars = ["BMW", "Volvo", "Saab", "Ford"];
-let i = 0;
-let text = "";
+// const cars = ["BMW", "Volvo", "Saab", "Ford"];
+// let i = 0;
+// let text = "";
 
 // for ( ; cars[i]; ) {
 //   text = cars[i];
@@ -128,6 +128,84 @@ let text = "";
 
 // console.log("Today is " + day);
 
+// let y;
+// const cars = ['BMW', 'Volvo', 'Mini'];
+// for (let x of cars) {
+//   y = console.log(x);
+// }
+
+// const obj = { a: 1, b: 2, c: 3 };
+
+// for (const prop in obj) {
+//   console.log(`${prop} = ${obj[prop]}`);
+// }
+
+
+// const triangle = { a: 1, b: 2, c: 3 };
+
+// function ColoredTriangle() {
+//   this.color = "red";
+// }
+
+// ColoredTriangle.prototype = triangle;
+
+// const obj = new ColoredTriangle();
+
+// for (const prop in obj) {
+//   if (Object.hasOwn(obj, prop)) {
+//     console.log(`obj.${prop} = ${obj[prop]}`);
+//   }
+// }
+
+
+// const obj = { a: 1, b: 2 };
+
+// for (const prop in obj) {
+//   console.log(`obj.${prop} = ${obj[prop]}`);
+//   obj.c = 3;
+// }
+
+
+// const array = ["a", "b", "c"];
+
+// for (const element of array) {
+//   console.log(element);
+// }
+
+// const iterable = [10, 20, 30];
+
+// for (let value of iterable) {
+//   value += 1;
+//   console.log(value);
+// }
+
+
+//const iterable = [10, 20, 30];
+// const iterable = "trainee";
+
+// for (const value of iterable) {
+//   console.log(value);
+// }
+
+const iterable = new Map([
+  ["a", 1],
+  ["b", 2],
+  ["c", 3],
+]);
+
+for (const entry of iterable) {
+  console.log(entry);
+}
+// ['a', 1]
+// ['b', 2]
+// ['c', 3]
+
+for (const [key, value] of iterable) {
+  console.log(value);
+}
+// 1
+// 2
+// 3
 
 
 //Edabait - easy questions
