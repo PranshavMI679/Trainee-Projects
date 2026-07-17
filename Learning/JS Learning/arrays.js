@@ -62,7 +62,9 @@
 // console.log(x);
 // console.log(y);
 
-const fruits = ["Banana", "Orange", "Apple", "Mango"];
+// const fruits = ["Banana", "Orange", "Apple", "Mango"];
 
-let myList = fruits.toString();
-console.log(myList); // Output: "Banana,Orange,Apple,Mango"
+// let myList = fruits.toString();
+// console.log(myList); // Output: "Banana,Orange,Apple,Mango"
+
+
