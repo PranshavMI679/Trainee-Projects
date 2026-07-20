@@ -165,10 +165,83 @@
 
 
 // Example syntax
-const report = "Page 1 Data\r\nPage 2 Data";
+// const report = "Page 1 Data\r\nPage 2 Data";
 
-console.log(report);
-
-
+// console.log(report);
 
 
+
+//----------Edabit Questions
+
+//-----------Array to String
+// function arrayToString(arr) {
+// 	return arr.join("")
+// }
+
+//---------Finding Nemo
+// function findNemo(sentence) {
+// 	let words = sentence.split(" ")
+// 	let a = words.indexOf("Nemo")
+// 	return (a >= 0 ? `I found Nemo at ${a+1}!` : `I can't find Nemo :(`)
+// }
+
+//----------------Get the Area of a Country
+// function areaOfCountry(name, area) {
+// 	let totalArea = 148940000
+// 	const percentage = ((area / totalArea) * 100).toFixed(2);
+// 	return `${name} is ${percentage}% of the total world's landmass`
+// }
+
+//-----------Match the last Item
+// let arr = ["rsq", "6hi", "g", "rsq6hig"]
+// //let arr = [1, 1, 1, "11"]
+// //let arr = [8, "thunder", true, "8thundertrue"]
+
+// function matchLastItem() {
+// 	let arr1 = arr.pop()
+// 	let arr2 = arr.join("")
+// 	return console.log(arr2 === String(arr1))
+// }
+
+// matchLastItem(arr)
+
+
+//----------bool to string
+// function boolToString(flag) {
+// 	return flag.toString()
+// }
+
+//---------bugg code 
+// function greeting(name) {
+//   (name === "Mubashir" ? "Hello, my Love!" : `Hello, ${name}!`);
+// }
+
+//----------Compare Strings by Count of Characters
+// function comp(str1, str2) {
+// 	return str1.length == str2.length
+// }
+
+//---------Miserable Parody of a Calculator
+
+// function calculator(str) {
+// 	return new Function(`return ${str}`)();
+// }
+
+
+//------------Find the Amount of Potatoes
+// function potatoes(str) {
+// 	let matches = str.match(/potato/g)
+// 	return matches ? matches.length : 0
+// }
+
+//-----------Error Messages
+// function error(n) {
+// 	const errorMessages = {
+// 		1: "Check the fan: e1",
+// 		2: "Emergency stop: e2",
+// 		3: "Pump Error: e3",
+// 		4: "c: e4",
+// 		5: "Temperature Sensor Error: e5"
+// 	};
+// 	return errorMessages[n] || 101;
+// }

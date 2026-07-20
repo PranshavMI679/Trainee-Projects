@@ -163,15 +163,50 @@
 
 
 
-const fruits = ["Banana", "Orange", "Apple", "Mango"];
-//console.log(fruits.join("-"))
-//let fruit = fruits.shift();
-console.log(fruits);
+// const fruits = ["Banana", "Orange", "Apple", "Mango"];
+// //console.log(fruits.join("-"))
+// //let fruit = fruits.shift();
+// console.log(fruits);
 
-let fruit = fruits.unshift("Lemon");
+// let fruit = fruits.unshift("Lemon");
 
-console.log(fruits)
+// console.log(fruits)
 
 
 
+
+// Edabit questions
+
+// -----Convert All Array Items to String
+//-------Similar Bread
+//---------50-30-20 Strategy
+//--------Less Than, Greater Than
+//----------Check if an Array Contains a Given Number
+//------Find the Index (Part #2)
+
+
+//-------------Converting Objects to Arrays
+// function toArray(obj) {
+// 	return Object.entries(obj)
+//}
+
+//---------------Conveinience Store
+// function changeEnough(change, amountDue) {
+//   let quarters = change[0] * 0.25
+//   let dime = change[1] * 0.10
+//   let nikel = change[2] * 0.05
+//   let penny = change[3] * 0.01
+//   let haveChange = quarters + dime + nikel + penny
+//   if (haveChange >= amountDue ? true : false)  
+// }
+
+//-----------Concatenate Variable Number of Input Arrays
+// function concat(...args) {
+// 	return args.flat()
+// }
+
+//------------Jackpot
+// function testJackpot(result) {
+//   return result.every((val) => val === result[0]);	
+// }
 

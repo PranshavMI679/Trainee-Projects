@@ -223,4 +223,95 @@ for (const [key, value] of iterable) {
 // }
 
 
-// Question-2
+//------------Forbiden Letter
+// function forbiddenLetter(char, arr) {
+// 	for (let letter of arr){
+// 		if (letter.includes(char)){
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
+
+//-------------Filter Strings from Array
+// function filterArray(arr) {
+// 	let arr2 = []
+// 	for (let a of arr){
+// 		if(Number.isInteger(a)){
+// 			arr2.push(a)
+// 		}
+// 	}
+// 	return arr2
+// }
+
+//------------Get the Sum of All Array Elements
+// function getSumOfItems(arr) {
+// 	let sum = 0;
+// 	for (let num of arr) {
+// 		sum += num; 
+// 	}
+	
+// 	return sum;
+// }
+
+//----------Return Types
+// function arrayValuesTypes(arr) {
+// 	let arr2 = []
+// 	for (let val of arr){
+// 		let a = typeof val
+// 		arr2.push(a)
+// 	}
+// 	return arr2
+// }
+
+//------------True Ones, False Zeros
+// function integerBoolean(n) {
+// 	let arr =[]
+// 	for (let x of n){
+// 		arr.push(x == 1 ? true : false)
+// 	}
+// 	return arr
+// }
+
+
+
+//------------Resistance
+// function seriesResistance(arr) {
+// 	let R = 0;
+// 	for (let r of arr){
+// 		R = R + r
+// 	}
+// 	let unit = R <= 1 ? "ohm" : "ohms"
+// 		return `${R} ${unit}`
+// }
+
+//------------Count Instances of a Character in a String
+// function charCount(myChar, str) {
+// 	let a = 0;
+// 	for (let val of str){
+// 		if (val === myChar){
+// 			a = a + 1
+// 		}
+// 	}
+// 	return a
+// }
+
+//-------------Sum of Cubes
+// function sumOfCubes(nums) {
+// 	let cube = 0;
+// 	for (let val of nums){
+// 		let c = val ** 3
+// 		cube = cube + c
+// 	}
+// 	return cube
+// }
+
+//---------------Is the Average of All Elements a Whole Number?
+// function isAvgWhole(arr) {
+// 	let a = 0;
+// 	for (let val of arr) {
+// 		a = a + val;
+// 	}
+// 	let average = a / arr.length;
+// 	return Number.isInteger(average);
+// }
