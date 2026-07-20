@@ -105,3 +105,150 @@ prototype.sayHi = function() {
 
 manager.sayHi();
 intern.sayHi();
+
+
+
+// const car = {
+//   type: "Fiat",
+//   model: "500",
+//   color: "white"
+// };
+// //console.log(car);
+
+// const person = {firstName:"John", lastName:"Doe", age:50, eyeColor:"blue"};
+
+// console.log(person);
+
+// Create an Object
+// const person = {};
+
+// // Add Properties
+// person.firstName = "John";
+// person.lastName = "Doe";
+// person.age = 50;
+// person.eyeColor = "blue";
+
+// console.log(person);
+// // console.log(person.firstName)
+// // //let x = person["firstName"]
+// // let x = person.firstName
+// // console.log(typeof x)
+
+// console.log(firstName + " " + this.lastName)
+
+
+// const person = {
+//   firstName: "John",
+//   lastName : "Doe",
+//   age      : 50,
+//   fullName : function() {
+//     return this.firstName + " " + this.lastName;
+//   }
+// };
+
+//console.log(person)
+
+//const person = {firstName:"John", lastName:"Doe", age:50, eyeColor:"blue"};
+
+//person.age = 22
+//delete person.age;
+// delete person["age"];
+
+// let x = ("age" in person)
+
+//console.log(x)
+
+
+// myObj = {
+//   name:"John",
+//   age:30,
+//   myCars: {
+//     car1:"Ford",
+//     car2:"BMW",
+//     car3:"Fiat"
+//   }
+// }
+
+// console.log(myObj.myCars.car2)
+
+// const person = {
+//   firstName: "John",
+//   lastName: "Doe",
+//   id: 5566,
+//   getId: function() {
+//     return this.id;
+//   }
+// };
+// //person.getId()
+// //let number = person.getId();
+// console.log(person.getId())
+
+
+// const person = {
+//   firstName: "John",
+//   lastName: "Doe",
+//   age: 50,
+//   fullName: function() {
+//     //return this.firstName + " " + this.lastName;
+//     return (this.firstName + " " + this.lastName).toUpperCase();
+//   }
+// };
+
+// let arr = Object.values(person)
+
+// console.log(arr)
+
+
+// const fruits = {Bananas:300, Oranges:200, Apples:500};
+
+// //let text = "";
+// // for (let [fruit, value] of Object.entries(fruits)) {
+// //   text = text + fruit + ": " + value ;
+// // }
+// let x = JSON.stringify(fruits)
+// console.log(x)
+
+
+// function Person(first, last, age, eye) {
+//   this.firstName = first;
+//   this.lastName = last;
+//   this.age = age;
+//   this.eyeColor = eye;
+// }
+
+// const myFather = new Person("John", "Doe", 50, "blue");
+// Person.prototype.nationality = "Indian";
+
+// console.log(myFather + " is also" + myFather.nationality )
+
+
+// function Person(first, last, age, eyecolor) {
+//   this.firstName = first;
+//   this.lastName = last;
+//   this.age = age;
+//   this.eyeColor = eyecolor;
+// }
+
+// const myFather = new Person("John", "Doe", 50, "blue");
+// const myMother = new Person("Sally", "Rally", 48, "green");
+
+// myMother.changeName = function (name){
+//   this.lastName = name
+// }
+
+// myMother.changeName("Doe")
+
+// console.log(myMother.lastName)
+
+
+// const fruits = {Bananas:300, Oranges:200, Apples:500};
+
+// // let x = JSON.stringify(fruits)
+// // console.log(x)
+
+// //let y = JSON.isRawJSON(x)
+// console.log(JSON.isRawJSON(fruits))
+
+
+
+
