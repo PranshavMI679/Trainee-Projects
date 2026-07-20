@@ -250,5 +250,71 @@ intern.sayHi();
 // console.log(JSON.isRawJSON(fruits))
 
 
+//---------------Edabit Questions
+
+//----------Upvotes and Downvotes
+// function getVoteCount(votes) {
+// 	return votes.upvotes - votes.downvotes
+// }
 
 
+//-----------------Lowercase and Uppercase Map
+// function mapping(letters) {
+// 	return Object.fromEntries(letters.map(letter => [letter, letter.toUpperCase()]));
+// }
+
+
+//-----------------Luke, I Am Your ...
+// function relationToLuke(name) {
+// 	const relations = {
+// 		"Darth Vader": "father",
+// 		"Leia": "sister",
+// 		"Han": "brother in law",
+// 		"R2D2": "droid"
+// 	};
+// 	return `Luke, I am your ${relations[name]}.`;
+// }
+
+//-------------Return the Objects Keys and Values
+// function keysAndValues(obj) {
+// 	return new Array(Object.keys(obj), Object.values(obj));
+// }
+
+//------------Can You Spare a Square?
+// function tpChecker(home) {
+// 	let a = home.tp * 500
+// 	let b = home.people * 57
+	
+// 	let days = Math.floor(a / b)
+// 	return (days >= 14 
+// 	 ? `Your TP will last ${days} days, no need to panic!`
+// 	 : `Your TP will only last ${days} days, buy more!`)
+// }
+
+//-------------Classes For Fetching Information on a Sports Player
+// class Player {
+// 	constructor(name, age, height, weight) {
+// 		this.name = name
+// 		this.age = age
+// 			this.height = height
+// 			this.weight = weight
+// 	}
+// 	getAge() {
+// 		return `${this.name} is age ${this.age}`
+// 	}
+// 	getHeight() {
+// 		return `${this.name} is ${this.height}cm`
+// 	}
+// 	getWeight() {
+// 		return `${this.name} weighs ${this.weight}kg`
+// 	}
+// }		
+
+
+//----------Find the Bug: Returning Valid Units of Measure
+// function hasValidUnitOfMeasure(product = {}) {
+// 	const { unitOfMeasure, comment } = product
+// 	return (Boolean(comment) || unitOfMeasure === 'L' || unitOfMeasure === 'PCE')
+// }
+
+//

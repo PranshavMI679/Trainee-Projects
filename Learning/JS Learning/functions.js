@@ -54,13 +54,13 @@
 
 //--------IIFE--------
 
-(function chai(){
-  console.log(`DB CONNECTED`);
-})();
+// (function chai(){
+//   console.log(`DB CONNECTED`);
+// })();
 
-( (name) => {
-  console.log(`Hello ${name}`)
-})('Pranshav')
+// ( (name) => {
+//   console.log(`Hello ${name}`)
+// })('Pranshav')
 
 //----------Argument Object Functions----------
 
@@ -140,3 +140,74 @@
 // }
 
 // chai()
+
+
+// function myFunc(theObject) {
+//   theObject.make = "Toyota";
+// }
+
+// const myCar = {
+//   make: "Honda",
+//   model: "Accord",
+//   year: 1998,
+// };
+
+// console.log(myCar.make); // "Honda"
+// myFunc(myCar);
+// console.log(myCar.make); // "Toyota"
+
+
+
+
+// function addSquares(a, b) {
+//   function square(x) {
+//     return x * x;
+//   }
+//   return console.log(square(a) + square(b));
+// }
+
+// addSquares(2, 3)
+
+
+
+// const square = function (number) {
+//   return number * number;
+// };
+
+// console.log(square(4)); // 16
+
+
+
+// const factorial = function fac(n) {
+//   return n < 2 ? 1 : n * fac(n - 1);
+// };
+
+// console.log(factorial(3)); // 6
+
+
+
+
+// function map(f, a) {
+//   const result = new Array(a.length);
+//   for (let i = 0; i < a.length; i++) {
+//     result[i] = f(a[i]);
+//   }
+//   return result;
+// }
+
+// const numbers = [0, 1, 2, 5, 10];
+// const cubedNumbers = map(function (x) {
+//   return x * x * x;
+// }, numbers);
+// console.log(cubedNumbers); // [0, 1, 8, 125, 1000]
+
+
+
+// function factorial(n) {
+//   if (n === 0 || n === 1) {
+//     return console.log(1);
+//   }
+//   return console.log(n * factorial(n - 1));
+// }
+
+// factorial(5)
