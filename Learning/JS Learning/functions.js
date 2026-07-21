@@ -379,3 +379,133 @@
 
 // const arr = multiply(2, 1, 2, 3);
 // console.log(arr); // [2, 4, 6]
+
+
+
+
+// Function
+
+// You can call it BEFORE it is written in the file because of hoisting
+// const area = calculateArea(5, 4); 
+// console.log(area); // Output: 20
+
+// // The Declaration
+// function calculateArea(width, height) {
+//     return width * height;
+// }
+
+
+// Function Expression
+
+// console.log(multiply(2, 3)); // ERROR! Cannot access before initialization\
+// The Expression
+// const multiply = function(a, b) {
+//     return a * b;
+// };
+
+// // You must call it AFTER it is written
+// console.log(multiply(2, 3)); // Output: 6
+
+
+// Arrow Function
+
+// const prices = [1, 2, 3]
+
+// // Example A: Super compact syntax with implicit return (no curly braces needed)
+// const doubled = prices.map(price => price * 2);
+// console.log(doubled); 
+
+// Example B: Preserving 'this' context inside a timer
+// const timerObj = {
+//     seconds: 0,
+//     start() {
+//         // Arrow function inherits 'this' from timerObj, so this.seconds works
+//         setInterval(() => {
+//             this.seconds++;
+//             console.log(`Seconds elapsed: ${this.seconds}`);
+//         }, 1000);
+//     }
+// };
+
+// timerObj.start()
+
+
+//IIFE
+
+// Everything inside this function stays completely private
+// (function() {
+//     const internalSecret = "9823-XDA-832";
+    
+//     console.log("Application is initializing...");
+//     console.log(`Connected to secure port: ${internalSecret}`);
+// })();
+
+// Trying to access the variable outside crashes the program safely
+//console.log(internalSecret); // ReferenceError: internalSecret is not defined
+
+
+
+
+// function init() {
+//   var name = "Mozilla"; // name is a local variable created by init
+//   function displayName() {
+//     // displayName() is the inner function, that forms a closure
+//     console.log(name); // use variable declared in the parent function
+//   }
+//   displayName();
+// }
+// init();
+
+
+// Recursion
+
+// function countDown(number) {
+//     // 1. Base Case (The Stop Condition)
+//     if (number <= 0) {
+//         console.log("Blast off!");
+//         return;
+//     }
+//     console.log(number);
+//     // 2. Recursive Call (Pushes a new frame onto the Call Stack)
+//     countDown(number - 1); 
+// }
+// countDown(3);
+// // Stack visualization during execution:
+// // [countDown(0)] -> Hits base case, returns
+// // [countDown(1)]
+// // [countDown(2)]
+// // [countDown(3)] -> Original call
+
+
+//Lexical Scoping
+
+// const globalName = "Alice";
+
+// function outerFunction() {
+//     const outerName = "Bob";
+//     function innerFunction() {
+//         // Looks locally (fails), looks lexically upward to outerFunction (finds outerName)
+//         console.log(outerName); // Output: Bob
+//         // Looks locally (fails), looks to outerFunction (fails), looks to global (finds globalName)
+//         console.log(globalName); // Output: Alice
+//     }
+//     innerFunction();
+// }
+// outerFunction();
+
+
+// Closures
+
+// function createCounter() {
+//     let count = 0; // This variable lives inside the parent scope
+//     return function() {
+//         count++; // The inner function remembers 'count' via closure
+//         return count;
+//     };
+// }
+// // createCounter executes, returns the inner function, and pops off the Call Stack
+// const counter = createCounter(); 
+// // Even though createCounter is dead and off the stack, counter() still remembers 'count'!
+// console.log(counter()); // Output: 1
+// console.log(counter()); // Output: 2
+
