@@ -31,9 +31,9 @@
 // console.log(fibonacci(10));
 // // 55
 
-const reduce = (fn, acc, [cur, ...rest]) =>
-  cur === undefined ? acc : reduce(fn, fn(acc, cur), rest);
-console.log(reduce((a, b) => a + b, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9]));
+// const reduce = (fn, acc, [cur, ...rest]) =>
+//   cur === undefined ? acc : reduce(fn, fn(acc, cur), rest);
+// console.log(reduce((a, b) => a + b, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9]));
 // 45
 
 
@@ -51,6 +51,57 @@ console.log(reduce((a, b) => a + b, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9]));
 //     return 0;
 //   }
 //   return 1 + length(str.slice(1));
+// }
+
+//------Recursion: Reverse a String
+
+// function reverse(str) {
+// 	if (str.length <= 1) return str;
+	
+// 	return reverse(str.slice(1)) + str[0];
+// }
+
+
+//----------------Recursion: Sum
+// function sum(n) {
+// 	if (n == 0){
+// 		return n
+// 	}
+// 	return n + sum(n-1)
+// }
+
+
+//------------Array Sum
+// function sum(arr) {
+// 	if (arr.length === 0){
+// 		return 0
+// 	}
+// 	return arr[0] + sum(arr.slice(1))
+// }
+
+//--------------Add up the Numbers from a Single Number
+// function addUp(num) {
+// 	if( num === 0){
+// 		return num
+// 	}
+// 	return num + addUp(num - 1)
+// }
+
+//--------------Number of Squares in an N * N Grid
+// function numberSquares(n) {
+// 	if (n === 0){
+// 		return 0
+// 	}
+// 	return n ** 2 + numberSquares(n - 1)
+// }
+
+
+//---------
+// function multiSum(num, ten=10) {
+// 	if (ten === 0){
+// 		return 0
+// 	}
+// 	return (num * ten) + multiSum(num, ten - 1);
 // }
 
 //---------Medium
@@ -86,4 +137,3 @@ console.log(reduce((a, b) => a + b, 0, [1, 2, 3, 4, 5, 6, 7, 8, 9]));
 // 	let nextNum = (num % 2 === 0 ? num/2 : num*3+1)
 // 	return 1 + collatz(nextNum)
 // }
-
