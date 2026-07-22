@@ -43,20 +43,40 @@
 
 
 // A standard function returning a Promise
-function fetchUserData() {
-    return new Promise((resolve) => setTimeout(() => resolve("User: Trainee"), 1000));
-}
+// function fetchUserData() {
+//     return new Promise((resolve) => setTimeout(() => resolve("User: Trainee"), 1000));
+// }
 
-async function displayDashboard() {
-    try {
-        console.log("Loading dashboard...");
-        const user = await fetchUserData(); 
-        console.log(`Welcome back, ${user}`);
-    } catch (error) {
-        console.error("Failed to load dashboard:", error);
-    }
-}
+// async function displayDashboard() {
+//     try {
+//         console.log("Loading dashboard...");
+//         const user = await fetchUserData(); 
+//         console.log(`Welcome back, ${user}`);
+//     } catch (error) {
+//         console.error("Failed to load dashboard:", error);
+//     }
+// }
 
-displayDashboard();
+// displayDashboard();
+
+
+
+// const myPromise = new Promise((resolve, reject) => {
+//   setTimeout(() => {
+//     resolve("foo");
+//   }, 300);
+// });
+
+// myPromise
+//   .then((value) => `${value} and bar`)
+//   .then((value) => `${value} and bar again`)
+//   .then((value) => `${value} and again`)
+//   .then((value) => `${value} and again`)
+//   .then((value) => {
+//     console.log(value);
+//   })
+//   .catch((err) => {
+//     console.error(err);
+//   });
 
 

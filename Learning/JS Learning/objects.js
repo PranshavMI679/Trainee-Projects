@@ -93,18 +93,18 @@
 // }
 
 // Add sayHi function to both objects
-manager.sayHi = sayHi;
-intern.sayHi = sayHi;
+// manager.sayHi = sayHi;
+// intern.sayHi = sayHi;
 
-manager.sayHi(); // Hello, my name is Karina
-intern.sayHi(); // Hello, my name is Tyrone
+// manager.sayHi(); // Hello, my name is Karina
+// intern.sayHi(); // Hello, my name is Tyrone
 
-prototype.sayHi = function() {
-  console.log(`Hello, my name is ${this.name}`);
-};
+// prototype.sayHi = function() {
+//   console.log(`Hello, my name is ${this.name}`);
+// };
 
-manager.sayHi();
-intern.sayHi();
+// manager.sayHi();
+// intern.sayHi();
 
 
 
@@ -252,7 +252,7 @@ intern.sayHi();
 
 
 //mr_tester2
-//mrtester2@yopmail.com
+//tester2@yopmail.com
 //tester..679
 
 
@@ -323,4 +323,203 @@ intern.sayHi();
 // 	return (Boolean(comment) || unitOfMeasure === 'L' || unitOfMeasure === 'PCE')
 // }
 
-//
+
+//mrtester4@yopmail.com
+//tester..679
+
+
+//-----------Make a Circle with OOP
+// class Circle {
+// 	// write your code here
+// 	constructor(radius){
+// 		this.radius = radius
+// 	}
+// 	getArea(){return Math.PI * (this.radius ** 2)}
+//   getPerimeter(){return (Math.PI * this.radius) *2}
+// }
+
+//-------------Get Sum of People's Budget
+// function getBudgets(arr) {
+// 	let sum = 0
+// 	arr.forEach((person) => {
+// 		sum = sum + person.budget
+// 	})
+// 	return sum
+// }
+
+//---------------Burglary Series (04): Add its Name
+// function addName(obj, name, value) {
+// 	return {...obj, [name]: value}
+// }
+
+//------------------Rectangle Series 1: Skeleton
+// Rectangle Class
+// class Rectangle{
+// 	constructor(x, y, width, height){
+// 		this.x = x
+// 		this.y = y
+// 		this.width = width
+// 		this.height = height
+// 	}
+// 	toString(){
+// 		return `[x=${this.x}, y=${this.y}, width=${this.width}, height=${this.height}]`;
+// 	}
+// }
+
+//-----------------Name Classes
+// class Name {
+//   constructor(fname, lname) {
+//     this.fname = fname.charAt(0).toUpperCase() + fname.slice(1).toLowerCase();
+//     this.lname = lname.charAt(0).toUpperCase() + lname.slice(1).toLowerCase();
+//   }
+
+//   get fullname() {
+//     return `${this.fname} ${this.lname}`;
+//   }
+
+//   get initials() {
+//     return `${this.fname.charAt(0)}.${this.lname.charAt(0)}`;
+//   }
+// }
+
+//-------First class, second class, third class levers
+// function determineLever(arr) {
+// 	const levers = {
+// 		'efl': 'first class lever',
+// 		'elf': 'second class lever',
+// 		'fel': 'third class lever'
+// 	}
+// 	const key = arr.join('')
+// 	return levers[key]
+// }
+
+//----------------------------------Burglary Series (20): Sign Your Name
+// function signYourName(obj) {
+//   // write your code here
+// 	// don't use a return statement
+// 		if ('yourSignature' in obj) obj.yourSignature = "Whatever";
+//     if ('spouseSignature' in obj) obj.spouseSignature = "Nice Try";
+	
+// 	Object.freeze(obj);
+	
+//   // DON'T CHANGE OR REMOVE THE LINES BELOW
+//   obj.yourSignature = "Whatever";
+// 	obj.spouseSignature = "Nice Try"
+//   return obj;
+// }
+
+//-----------------Printer Levels
+// function inkLevels(inks) {
+// 	return Math.min(...Object.values(inks))
+// }
+
+
+// const obj1 = {
+//   car1: "BMW",
+//   model1: "M5"
+// }
+
+// const obj2 = {
+//   car2: "Audi",
+//   model2: "A4"
+// }
+
+//---------Longer method
+// const arr1 = Object.entries(obj1)
+// const arr2 = Object.entries(obj2)
+
+// const arr = arr1.concat(arr2)
+
+// const mainObj = Object.fromEntries(arr)
+
+// console.log(mainObj)
+
+//-----easy method
+// const cars = {...obj1, ...obj2}
+
+// console.log(cars)
+
+// Object.values(cars).forEach(val => {
+//   console.log(val)
+// });
+
+
+
+// const myHonda = {
+//   color: "red",
+//   wheels: 4,
+//   engine: { cylinders: 4, size: 2.2 },
+// };
+
+
+// console.log(Object.entries(myHonda))
+
+
+// function Person(first, last, age, eye) {
+//   this.firstName = first;
+//   this.lastName = last;
+//   this.age = age;
+//   this.eyeColor = eye;
+// }
+
+// const myFather = new Person('X', 'Z', 50, 'brown');
+
+// console.log('My father age is ' + myFather.age + '.')
+
+// console.log(myFather)
+
+
+
+// //.preventExtension
+// const car = { brand: "Tesla", color: "Red" };
+// Object.preventExtensions(car);
+
+// car.year = 2026;   //  Ignored! Cannot add new properties.
+// car.color = "Blue"; //  Works! Can modify existing properties.
+// delete car.brand;   //  Works! Can delete existing properties.
+
+// console.log(car); // Output: { color: 'Blue' }
+
+// // .seal()
+// const user = { name: "Alice", role: "Admin" };
+// Object.seal(user);
+
+// user.age = 25;       //  Ignored! Cannot add.
+// delete user.role;    // Ignored! Cannot delete.
+// user.role = "User";  // Works! Can modify values.
+
+// console.log(user); // Output: { name: 'Alice', role: 'User' }
+
+
+// // .freeze()
+// const config = { theme: "dark", version: 1.0 };
+// Object.freeze(config);
+
+// config.version = 2.0; //  Ignored! Cannot modify.
+// config.lang = "en";   //  Ignored! Cannot add.
+// delete config.theme;  //  Ignored! Cannot delete.
+
+// console.log(config); // Output: { theme: "dark", version: 1 }
+
+
+
+
+// Animal properties and method encapsulation
+// const animalProto = {
+//   type: "Invertebrates", // Default value of properties
+//   displayType() {
+//     // Method which will display the type of animal
+//     console.log(this.type);
+//   },
+// };
+
+// // Create a new animal type called `animal`
+// const animal = Object.create(animalProto);
+// animal.displayType(); // Logs: Invertebrates
+
+// // Create a new animal type called fish
+// const fish = Object.create(animalProto);
+// fish.type = "Fishes";
+// fish.displayType(); // Logs: Fishes
+
+

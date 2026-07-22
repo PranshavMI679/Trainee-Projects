@@ -96,7 +96,7 @@
 // }
 
 
-//---------
+//---------Sum of Multiplication
 // function multiSum(num, ten=10) {
 // 	if (ten === 0){
 // 		return 0
@@ -137,3 +137,80 @@
 // 	let nextNum = (num % 2 === 0 ? num/2 : num*3+1)
 // 	return 1 + collatz(nextNum)
 // }
+
+
+
+
+//------------The Perrin Sequence
+// function perrin(n) {
+// 	if (n === 0) return 3;
+//   if (n === 1) return 0;
+//   if (n === 2) return 2;
+	
+// 	return perrin(n - 2) + perrin(n - 3)
+// }
+
+// console.log(perrin(7))
+
+
+//----------------Algorithms II: The Euclidean Algorithm
+// function euclidean(a, b) {
+// 	if (a < b){
+// 		[a, b] = [b, a]
+// 	}
+// 	let r = a % b
+// 	if (r === 0){
+// 		return b
+// 	}
+// 	return euclidean(b, r)
+// }
+
+
+//--------------The Fibonacci Number
+// function fibonacci(num) {
+// 	if (num === 0 || num === 1){
+// 		return 1
+// 	}
+// 	return fibonacci(num - 1) + fibonacci(num - 2)
+// }
+
+//-----------------Recursion: Fibonacci Numbers
+// function fib(n) {
+// 	if (n === 0){ return 0 }
+// 	if (n === 1) { return 1 }
+	
+// 	return fib(n - 1) + fib(n - 2)
+// }
+
+//------------Double Factorial
+// function doubleFactorial(num) {
+// 	if (num === -1 || num === 0 || num === 1){
+// 		return 1
+// 	}
+// 	return num * doubleFactorial(num - 2)
+// }
+
+
+//----------------Positive Integer Into Base 2, 8 and 16
+// function integerToString(number, base) {
+// 	if ( number === 0) { return "" }
+	
+// 	const digits = '0123456789abcdef'
+// 	let remainder = number % base
+// 	let newNum = Math.floor(number / base)
+	
+// 	return integerToString(newNum, base) + digits[remainder]
+// }
+
+//-------------------Recursion: String Palindromes
+// function isPalindrome(str) {
+//   if (str.length === 0 || str.length === 1) {
+//     return true;
+//   }
+//   if (str[0] === str[str.length - 1]) {
+//     return isPalindrome(str.slice(1, -1));
+//   }
+//   return false;
+// }
+
+

@@ -151,29 +151,73 @@
 
 
 // Wrapping the same tasks in Promises
-const boilWater = () => new Promise(res => setTimeout(() => res("1. Water is boiled."), 1000));
-const addCoffee = () => new Promise(res => setTimeout(() => res("2. Coffee powder added."), 1000));
-const addMilk = () => new Promise(res => setTimeout(() => res("3. Milk added. Your coffee is ready!"), 1000));
+// const boilWater = () => new Promise(res => setTimeout(() => res("1. Water is boiled."), 1000));
+// const addCoffee = () => new Promise(res => setTimeout(() => res("2. Coffee powder added."), 1000));
+// const addMilk = () => new Promise(res => setTimeout(() => res("3. Milk added. Your coffee is ready!"), 1000));
 
-// --- THE CLEAN SOLUTION ---
-async function makeCoffee() {
-    const step1 = await boilWater();
-    console.log(step1);
+// // --- THE CLEAN SOLUTION ---
+// async function makeCoffee() {
+//     const step1 = await boilWater();
+//     console.log(step1);
 
-    const step2 = await addCoffee();
-    console.log(step2);
+//     const step2 = await addCoffee();
+//     console.log(step2);
 
-    const step3 = await addMilk();
-    console.log(step3);
+//     const step3 = await addMilk();
+//     console.log(step3);
 
-    console.log("Coffee process finished!");
-}
+//     console.log("Coffee process finished!");
+// }
 
-makeCoffee();
-
-
+// makeCoffee();
 
 
 
 
+// setTimeout(myFunction, 3000);
 
+// function myFunction() {
+//   console.log("hello world");
+// }
+
+
+
+// function myDisplayer(some) {
+//   console.log(some);
+// }
+
+// // Function to calculate a sum
+// function myCalculator(num1, num2) {
+//   let sum = num1 + num2;
+//   return sum;
+// }
+
+// // Call the calculator
+// let result = myCalculator(5, 5);
+
+// // Call the displayer
+// myDisplayer(result);
+
+
+
+// function myDisplayer(some) {
+//   console.log(some);
+// }
+
+// function myCalculator(num1, num2, myCallback) {
+//   let sum = num1 + num2;
+//   myCallback(sum);
+// }
+
+// myCalculator(5, 5, myDisplayer);
+
+// "use strict"
+// function myFunction() {
+//   return this;
+// }
+
+// console.log(myFunction())
+
+// "use strict"
+// let x = this
+// console.log(x)
