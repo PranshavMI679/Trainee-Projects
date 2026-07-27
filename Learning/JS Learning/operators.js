@@ -49,6 +49,15 @@
 
 // console.log(x)
 
+let result = 5 & 3; 
+console.log(result); // Outputs: 1- 1
+
+let result = 5 | 3;
+console.log(result); // Outputs: 7 -111
+
+let result = 5 ^ 3;
+console.log(result); // Outputs: 6 - 110
+
 
 //------------Bitwise Operators--------
 
@@ -61,6 +70,9 @@
 // const a = 0b1010n; // 10n
 // const b = 0b1100n; // 12n
 // console.log(a & b); // 0b1000n (8n)
+
+console.log(~5);  // Outputs: -6
+console.log(~-1); // Outputs: 0
 
 
 

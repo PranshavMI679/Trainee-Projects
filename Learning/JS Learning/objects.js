@@ -523,3 +523,77 @@
 // fish.displayType(); // Logs: Fishes
 
 
+// // Literal
+// const user = { name: 'Alice', role: 'Admin' };
+
+// // Object.create (user2 inherits from user)
+// const user2 = Object.create(user);
+// user2.name = 'Bob'; 
+// console.log(user2.role); // "Admin" (inherited)
+// user2.role = 'User'
+// console.log(user2)
+
+
+// const original = { a: 1, nested: { b: 2 } };
+
+// // Shallow clone
+// const shallow = { ...original };
+// // const shallow = Object.assign({}, original); // older equivalent
+
+// // Deep clone
+// const deep = structuredClone(original);
+
+// console.log(shallow)
+// console.log(deep)
+
+
+//----object Prototype
+
+// // 1. We create a "tutor" object holding the shared methods
+// const userMethods = {
+//   login() {
+//     console.log(`${this.name} logged in.`);
+//   }
+// };
+
+// // 2. We create a user and link it to the tutor using Object.create()
+// const user1 = Object.create(userMethods);
+// user1.name = "Alice";
+
+// // 3. We create another user and link it to the same tutor
+// const user2 = Object.create(userMethods);
+// user2.name = "Bob";
+
+// // Alice doesn't own the login method, but her prototype does!
+// user1.login(); // "Alice logged in."
+// user2.login(); // "Bob logged in."
+
+
+
+//---------Prototypal inheritance
+
+// // The base prototype (Professor)
+// const baseUser = {
+//   isLoggedIn: false,
+//   login() { this.isLoggedIn = true; }
+// };
+
+// // The admin prototype (Tutor) - inherits from baseUser
+// const adminUser = Object.create(baseUser); 
+// adminUser.deleteAccount = function() {
+//   console.log("Account deleted!");
+// };
+
+// // The actual user object (You) - inherits from adminUser
+// const myAdmin = Object.create(adminUser);
+// myAdmin.name = "Charlie";
+
+// // Lookup process in action:
+// myAdmin.deleteAccount(); 
+// // 1. Does myAdmin have it? No.
+// // 2. Does adminUser have it? Yes. Execute it.
+
+// myAdmin.login(); 
+// // 1. Does myAdmin have it? No.
+// // 2. Does adminUser have it? No.
+// // 3. Does baseUser have it? Yes. Execute it.
