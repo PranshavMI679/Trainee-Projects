@@ -431,3 +431,21 @@ verifyInventory("laptop")
   .finally(() => {
     console.log("Inventory check completed."); // Always runs
   });
+
+
+
+  console.log("Start");
+
+setTimeout(function cb(){
+    console.log("Callback");
+}, 5000);
+
+console.log("End");
+
+let startDate = new Date().getTime();
+let endDate = startDate;
+while(endDate < startDate + 10000){
+    endDate = new Date().getTime();
+}
+
+console.log("While Expires");
