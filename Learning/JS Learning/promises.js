@@ -258,9 +258,9 @@
 //-------------Promise Methods
 
 // Setup background tasks for the examples below
-const checkFlight = new Promise(res => setTimeout(() => res("Flight booked"), 1000));
-const checkHotel  = new Promise(res => setTimeout(() => res("Hotel booked"), 2000));
-const checkCar    = new Promise((_, rej) => setTimeout(() => rej("No cars available"), 1500));
+//const checkFlight = new Promise(res => setTimeout(() => res("Flight booked"), 1000));
+//const checkHotel  = new Promise(res => setTimeout(() => res("Hotel booked"), 2000));
+//const checkCar    = new Promise((_, rej) => setTimeout(() => rej("No cars available"), 1500));
 
 
 ////----------- .all()
@@ -368,5 +368,66 @@ const checkCar    = new Promise((_, rej) => setTimeout(() => rej("No cars availa
 
 
 
+// async function processOrder() {
+//   try {
+//     const message = await checkStock("laptop");
+//     console.log(message); // Logs: "Item is in stock!"
+//   } catch (error) {
+//     console.error(error.message); // Catches the rejected promise error
+//   }
+// }
+
+// processOrder();
 
 
+// const promise = new Promise(function(resolve, reject) {
+//   const success = true;
+
+//  if (success) {
+//     resolve("Operation completed");
+//  } else {
+//     reject("Operation failed");
+//   }
+// });
+
+// promise
+// .then(function(value) {
+//   myDisplayer(value);
+// })
+// .catch(function(error) {
+//   myDisplayer(error);
+// });
+
+// function myDisplayer(text){
+//     console.log(text)
+// }
+
+
+// Step 1: Create a function that returns a Promise
+function verifyInventory(item) {
+  return new Promise((resolve, reject) => {
+    console.log("Checking stock...");
+    
+    setTimeout(() => {
+      const inStock = item === "laptop";
+
+      if (inStock) {
+        resolve("Item available!"); // Moves state from pending -> fulfilled
+      } else {
+        reject(new Error("Out of stock")); // Moves state from pending -> rejected
+      }
+    }, 1500); // Simulates database latency
+  });
+}
+
+// Step 2: Consume the Promise using chaining
+verifyInventory("laptop")
+  .then((message) => {
+    console.log("Success:", message); 
+  })
+  .catch((error) => {
+    console.error("Error:", error.message);
+  })
+  .finally(() => {
+    console.log("Inventory check completed."); // Always runs
+  });

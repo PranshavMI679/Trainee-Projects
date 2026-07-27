@@ -214,3 +214,27 @@
 // }
 
 
+//-----------Travelling
+
+function paths(n) {
+	if (n <= 1){
+		return 1
+	}
+	return n * paths(n - 1)
+}
+
+//------------Double factorial
+function doubleFactorial(num) {
+	if(num <= 1){
+		return 1
+	}
+	return num * doubleFactorial(num - 2)
+}
+
+//--------------GCD of two numbers
+function gcd(n1, n2) {
+  if(n2 === 0){
+    return n1
+  }
+  return gcd(n2, n1 % n2)
+}

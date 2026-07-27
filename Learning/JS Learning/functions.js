@@ -509,3 +509,110 @@
 // console.log(counter()); // Output: 1
 // console.log(counter()); // Output: 2
 
+
+// console.log(this)
+
+// function showContent(){
+//     console.log(this)
+// }
+
+// showContent()
+
+
+
+// const profile1 = { username: "TechGuru", level: 5 };
+// const profile2 = { username: "PixelArt", level: 12 };
+
+// function updateStatus(message, region) {
+//   console.log(`[${region}] ${this.username} (Lvl ${this.level}): "${message}"`);
+// }
+
+// //Call
+// // Syntax: function.call(object, arg1, arg2)
+// updateStatus.call(profile1, "Coding some JavaScript!", "US-East");
+// // Output: [US-East] TechGuru (Lvl 5): "Coding some JavaScript!"
+
+// updateStatus.call(profile2, "Just finished a design.", "EU-West");
+// // Output: [EU-West] PixelArt (Lvl 12): "Just finished a design."
+
+
+// //Apply
+// // Imagine this array comes dynamically from a user input form
+// const inputData = ["Streaming live gameplay now!", "Asia-South"];
+
+// // Syntax: function.apply(object, [array of args])
+// updateStatus.apply(profile2, inputData);
+// // Output: [Asia-South] PixelArt (Lvl 12): "Streaming live gameplay now!"
+
+
+// //Bind
+// // 1. Glue 'this' to profile1 and pre-load the arguments
+// const delayedStatus = updateStatus.bind(profile1, "Be right back!", "Global");
+
+// // 2. Hand it to the timer. It runs 1 second later perfectly!
+// setTimeout(delayedStatus, 1000);
+// // Output after 1 second: [Global] TechGuru (Lvl 5): "Be right back!"
+
+
+
+
+// function createBankAccount(ownerName) {
+//   // This variable is private and locked inside this function's scope
+//   let balance = 0; 
+//   return {
+//     deposit(amount) {
+//       balance += amount;
+//       console.log(`${ownerName} deposited $${amount}. Balance: $${balance}`);
+//     },
+//     getBalance() {
+//       return balance; // Read-only access to the private variable
+//     }
+//   };
+// }
+// const myAccount = createBankAccount("Alex");
+// myAccount.deposit(100); // Logs: "Alex deposited $100. Balance: $100"
+// console.log(myAccount.balance); // Logs: undefined (Direct access is blocked!)
+// console.log(myAccount.getBalance()); // Logs: 100
+
+
+
+// async function getData() {
+//   try {
+//     const response = await fetch("https://example.com");
+//     const data = await response.json();
+//     console.log("Success:", data);
+//   } catch (error) {
+//     console.error("Something went wrong:", error);
+//   }
+// }
+
+// getData()
+
+
+// // A Greet Function
+// function greet(name, callback) {
+//   callback("Hello " + name);
+// }
+
+// // A Display Function
+// function display(message) {
+//   console.log(message);
+// }
+
+// // Call greet() with a callback function (display)
+// greet("John", display);
+
+
+// function myDisplayer(some) {
+//   console.log(some);
+// }
+
+// function myCalculator(num1, num2, myCallback) {
+//   let sum = num1 + num2;
+//   myCallback(sum);
+// }
+
+// myCalculator(5, 5, myDisplayer);
+
+
+

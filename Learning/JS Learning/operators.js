@@ -96,3 +96,17 @@ let myString = "alpha";
 myString += "bet"; // evaluates to "alphabet" and assigns this value to myString.
 
 console.log(myString)
+
+
+
+const badId  = 12345678901234567;  // Normal Number (17 digits)
+const goodId = 12345678901234567n; // BigInt (17 digits)
+
+console.log(typeof badId);  // Output: 12345678901234568  <-- Changed! (Last digit is wrong)
+console.log(typeof goodId); // Output: 12345678901234567n <-- Perfect precision
+
+
+
+const c = Array("3");
+
+console.log()

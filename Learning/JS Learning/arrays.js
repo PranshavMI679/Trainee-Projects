@@ -210,3 +210,82 @@
 //   return result.every((val) => val === result[0]);	
 // }
 
+// const numbers = [];
+
+// // Purpose: Just print them out
+// numbers.forEach(num => console.log(num * 2)); 
+// // Output: 2, 4, 6
+
+// const result = numbers.forEach(num => num * 2);
+// console.log(result); // Output: undefined 🚨 (It returns nothing!)
+
+
+
+// let numbers = [];
+
+// // Purpose: Multiply every number by 10 and keep the results
+// let doubled = numbers.map(num => num * 10);
+
+// console.log(doubled); // Output: [10, 20, 30] ✅ (Brand new array)
+// console.log(numbers); // Output: [1, 2, 3]     (Original remains safe)
+
+
+
+
+const orderItems = [
+  { item: "Burger", price: 12, quantity: 2 },
+  { item: "Fries", price: 5, quantity: 1 },
+  { item: "Soda", price: 3, quantity: 3 }
+];
+
+// ✅ Correct: We capture a BRAND NEW array of identical length
+const receiptLines = orderItems.map(line => {
+  return `${line.quantity}x ${line.item} ($${line.price * line.quantity})`;
+});
+
+console.log(receiptLines);
+/* Output a fresh array of strings:
+[
+  "2x Burger ($24)",
+  "1x Fries ($5)",
+  "3x Soda ($9)"
+]
+*/
+
+// ✅ Correct: We crush the array down into a single final numerical value
+// The '0' at the very end is our starting point (initial accumulator value)
+const grandTotal = orderItems.reduce((runningTotal, line) => {
+  const lineCost = line.price * line.quantity;
+  return runningTotal + lineCost;
+}, 0);
+
+console.log(grandTotal); 
+// Output: 38 (A single number)
+
+
+// // ✅ Correct: No variable captures this. It returns undefined. 
+// // It simply runs a fire-and-forget operation for every item.
+// orderItems.forEach(line => {
+//   // Simulating a database update query
+//   decreaseInventoryInDatabase(line.item, line.quantity); 
+//   console.log(`Inventory reduced: ${line.quantity} units of ${line.item}.`);
+// });
+
+// /* Output:
+//    Inventory reduced: 2 units of Burger.
+//    Inventory reduced: 1 units of Fries.
+//    Inventory reduced: 3 units of Soda.
+// */
+
+
+
+const names = ["Alice", "Bob", "Charlie"];
+
+// Just print each name out to the screen
+names.forEach(name => console.log("Hello " + name));
+
+/* Output:
+   Hello Alice
+   Hello Bob
+   Hello Charlie
+*/
