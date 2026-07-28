@@ -597,3 +597,128 @@
 // // 1. Does myAdmin have it? No.
 // // 2. Does adminUser have it? No.
 // // 3. Does baseUser have it? Yes. Execute it.
+
+
+
+// const person = {
+//   firstName: "John",
+//   lastName : "Doe",
+//   id       : 5566,
+//   fullName : function() {
+//     return this.id + " " +this.firstName + " " + this.lastName;
+//   }
+// };
+
+// console.log(person.fullName())
+
+
+
+// const person = {
+//   firstName  : "John",
+//   lastName   : "Doe",
+//   id         : 5566,
+//   myFunction : function() {
+//     return this;
+//   }
+// };
+
+// console.log(person.myFunction())
+
+
+// const person1 = {
+//   fullName: function() {
+//     return this.firstName + " " + this.lastName;
+//   }
+// }
+
+// const person2 = {
+//   firstName:"John",
+//   lastName: "Doe",
+// }
+
+// // Return "John Doe":
+// console.log(person1.fullName.call(person2));
+
+
+// Create Target Object
+// const person1 = {
+//   firstName: "John",
+//   lastName: "Doe",
+//   age: 50,
+//   eyeColor: "blue"
+// };
+
+// // Create Source Object
+// const person2 = {firstName: "Anne",lastName: "Smith"};
+
+// // Assign Source to Target
+// Object.assign(person1, person2);
+// let text = Object.entries(person1);
+
+// console.log(text)
+
+// const fruits = [
+//   {name:"apples", quantity:300},
+//   {name:"bananas", quantity:500},
+//   {name:"oranges", quantity:200},
+//   {name:"kiwi", quantity:150}
+// ];
+
+// // Callback function to Group Elements
+// function myCallback({ quantity }) {
+//   return quantity > 200 ? "ok" : "low";
+// }
+
+// // Group by Quantity
+// const result = Object.groupBy(fruits, myCallback);
+
+// // console.log(result)
+// console.log(result)
+
+
+
+
+// // Create an object:
+// const person = {
+//   firstName: "John",
+//   lastName: "Doe",
+//   language: "eng",
+//   get lang() {
+//     return this.language;
+//   }
+// };
+// // Display data from the object using a getter:
+// console.log(person.lang);
+
+
+
+// const person = {
+//   firstName: "John",
+//   lastName: "Doe",
+//   language: "",
+//   set lang(lang) {
+//     this.language = lang;
+//   }
+// };
+// // Set an object property using a setter:
+// person.lang = "en";
+// // Display data from the object:
+// console.log(person.language);
+
+
+
+
+class Car {
+  constructor(name, year) {
+    this.name = name;
+    this.year = year;
+  }
+  age() {
+    const date = new Date();
+    return date.getFullYear() - this.year;
+  }
+}
+
+const myCar = new Car("H-i10", 2021);
+console.log("My car is " + myCar.age() + " years old.");
+

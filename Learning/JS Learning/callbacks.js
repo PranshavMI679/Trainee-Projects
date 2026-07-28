@@ -221,3 +221,53 @@
 // "use strict"
 // let x = this
 // console.log(x)
+
+
+
+
+// const numbers = [45, 4, 9, 16, 25];
+// let txt = "";
+// numbers.forEach(myFunction);
+
+// function myFunction(value) {
+//   txt = value
+//   console.log(txt)
+// }
+
+
+// const numbers1 = [45, 4, 9, 16, 25];
+// const numbers2 = numbers1.map(myFunction);
+
+// function myFunction(value) {
+//   return value * 2;
+// }
+
+// console.log(numbers2)
+
+
+
+// function myDisplayer(some) {
+//   console.log(some);
+// }
+// // Function to calculate a sum
+// function myCalculator(num1, num2) {
+//   let sum = num1 + num2;
+//   return sum;
+// }
+// // Call the calculator
+// let result = myCalculator(5, 5);
+// // Call the displayer
+// myDisplayer(result);
+
+
+function myDisplayer(some) {
+  console.log(some);
+}
+
+function myCalculator(num1, num2, myCallback) {
+  let sum = num1 + num2;
+  myCallback(sum);
+}
+
+myCalculator(5, 5, myDisplayer);
+

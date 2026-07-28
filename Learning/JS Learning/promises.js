@@ -404,30 +404,280 @@
 
 
 // Step 1: Create a function that returns a Promise
-function verifyInventory(item) {
-  return new Promise((resolve, reject) => {
-    console.log("Checking stock...");
+// function verifyInventory(item) {
+//   return new Promise((resolve, reject) => {
+//     console.log("Checking stock...");
     
-    setTimeout(() => {
-      const inStock = item === "laptop";
+//     setTimeout(() => {
+//       const inStock = item === "laptop";
 
-      if (inStock) {
-        resolve("Item available!"); // Moves state from pending -> fulfilled
-      } else {
-        reject(new Error("Out of stock")); // Moves state from pending -> rejected
-      }
-    }, 1500); // Simulates database latency
+//       if (inStock) {
+//         resolve("Item available!"); // Moves state from pending -> fulfilled
+//       } else {
+//         reject(new Error("Out of stock")); // Moves state from pending -> rejected
+//       }
+//     }, 1500); // Simulates database latency
+//   });
+// }
+
+// // Step 2: Consume the Promise using chaining
+// verifyInventory("laptop")
+//   .then((message) => {
+//     console.log("Success:", message); 
+//   })
+//   .catch((error) => {
+//     console.error("Error:", error.message);
+//   })
+//   .finally(() => {
+//     console.log("Inventory check completed."); // Always runs
+//   });
+
+
+
+
+// const fetchUserData = new Promise((resolve, reject) => {
+//   let success = true; // Simulating an operation outcome
+
+//   setTimeout(() => {
+//     if (success) {
+//       resolve({ id: 101, name: "Alice" }); // Changes state to Fulfilled
+//     } else {
+//       reject("User data could not be retrieved."); // Changes state to Rejected
+//     }
+//   }, 1500);
+// });
+
+// fetchUserData
+//   .then((data) => {
+//     console.log("Success:", data.name);
+//   })
+//   .catch((error) => {
+//     console.error("Error:", error);
+//   })
+//   .finally(() => {
+//     console.log("Operation finished.");
+//   });
+
+
+
+//------------Checking  Promises
+// const promise = new Promise((resolve) => {
+//   console.log("1: Sync Setup"); // RUNS INSTANTLY
+//   resolve();
+// });
+// promise.then(() => {
+//   console.log("3: Async Callback"); // RUNS LATER
+// });
+// console.log("2: Sync End"); // RUNS INSTANTLY
+
+
+//--------------Checking Async Await
+// async function myTask() {
+//   console.log("1: Sync execution"); // RUNS INSTANTLY
+//   await null; 
+//   console.log("3: Async execution"); // RUNS LATER
+// }
+// myTask();
+// console.log("2: Global Sync code"); // RUNS INSTANTLY
+
+
+
+// async function homeRoutine(){
+//   try {
+//     await Promise.all([turnOnGeyser(), turnOnToaster()]);
+//     await makeBreakfast();
+// }
+// catch(error){
+//   console.log("power tripped", error)
+// }
+// }
+
+
+
+// Simulating an asynchronous action that takes 2 seconds
+// function turnOnGeyser() {
+//   return new Promise((resolve) => {
+//     setTimeout(() => {
+//       console.log("Geyser is hot!");
+//       resolve("Geyser Done");
+//     }, 2000);
+//   });
+// }
+
+// // Simulating an asynchronous action that takes 1 second
+// function turnOnToaster() {
+//   return new Promise((resolve) => {
+//     setTimeout(() => {
+//       console.log("Toast is ready!");
+//       resolve("Toaster Done");
+//     }, 1000);
+//   });
+// }
+
+// // Simulating the final step that takes 1.5 seconds
+// function makeBreakfast() {
+//   return new Promise((resolve) => {
+//     setTimeout(() => {
+//       console.log("Breakfast is served!");
+//       resolve("Breakfast Done");
+//     }, 1500);
+//   });
+// }
+
+// // Your Async/Await Function
+// async function homeRoutine() {
+//   try {
+//     console.log("Starting morning routine...");
+//     // Both start running together right here
+//     await Promise.all([turnOnGeyser(), turnOnToaster()]);
+//     // This runs only after BOTH the geyser and toaster finish
+//     await makeBreakfast(); 
+//     console.log("Routine finished successfully!");
+//   } 
+//   catch (error) {
+//     console.log("Power tripped!", error);
+//   }
+// }
+// // Execute the function
+// homeRoutine();
+
+
+// setTimeout(myFunction, 3000);
+
+// function myFunction() {
+//   console.log("Helloooo");
+// }
+
+//myFunction()
+
+
+
+// fetch("fetch.txt")
+// .then(function(response) {
+//   return response.text();
+// })
+// .then(function(text) {
+//   myDisplayer(text);
+// })
+// .catch(function(error) {
+//   myDisplayer(error);
+// });
+// function myDisplayer(text) {
+//   console.log(text);
+// }
+
+
+// const promise = new Promise(function(resolve, reject) {
+//   const success = false;
+
+//  if (success) {
+//     resolve("Operation completed");
+//  } else {
+//     reject("Operation failed");
+//   }
+// });
+
+// promise.then(function(value) {
+//   myDisplayer(value);
+// })
+// .catch(function(error) {
+//   myDisplayer(error);
+// });
+
+// function myDisplayer(text) {
+//   console.log(text);
+// }
+
+
+// 📦 You ordered the package (Promise is created and pending)
+const orderData = new Promise((resolve) => {
+  setTimeout(() => {
+    resolve("New Smartphone");
+  }, 2000);
+});
+
+// If you stop here, the package arrives at your doorstep, 
+// but you never open the box. The data is unusable.
+
+// orderData
+//   .then((package) => console.log("Unboxed:", package)) // "Unboxed: 🎁 New Smartphone"
+//   .catch((err) => console.error("Delivery failed:", err));
+
+// async function openPackage() {
+//   const package = await orderData;
+//   console.log("Unboxed:", package);
+// }
+// openPackage();
+
+
+
+// 1. CREATION (A simple number verification promise)
+// function checkEvenNumber(number) {
+//   return new Promise((resolve, reject) => {
+//     if (number % 2 === 0) {
+//       resolve("Success: The number is even.");
+//     } else {
+//       reject("Error: The number is odd.");
+//     }
+//   });
+// }
+
+// // 2. CONSUMPTION (Using Async / Await)
+// async function runTests() {
+//   // Test Case A: Success Path
+//   try {
+//     const result = await checkEvenNumber(4);
+//     console.log(result); 
+//   } catch (error) {
+//     console.log(error);
+//   }
+
+//   // Test Case B: Error Path
+//   try {
+//     const result = await checkEvenNumber(7);
+//     console.log(result);
+//   } catch (error) {
+//     console.log(error); // This block runs instead
+//   }
+// }
+
+// runTests();
+
+
+// async function checkAge(age) {
+//   if (age < 18) {
+//     // This instantly rejects the promise with a rich stack trace
+//     throw new Error("You must be 18 or older."); 
+//   }
+//   return "Access Granted"
+// }
+
+// // Consuming it
+// try {
+//   const statusMessage = await checkAge(10);
+//   console.log(statusMessage)
+// } catch (error) {
+//   console.error(error.message); // "You must be 18 or older."
+//   console.error(error.stack);   // Shows exactly where the error happened
+//}
+
+
+
+function getSecretData() {
+  return new Promise((resolve) => {
+    resolve("Top Secret Code");
   });
 }
 
-// Step 2: Consume the Promise using chaining
-verifyInventory("laptop")
-  .then((message) => {
-    console.log("Success:", message); 
-  })
-  .catch((error) => {
-    console.error("Error:", error.message);
-  })
-  .finally(() => {
-    console.log("Inventory check completed."); // Always runs
-  });
+// 1. You run the function and save the promise to a variable
+const trappedResult = getSecretData();
+
+// 2. You try to print the variable directly
+console.log(trappedResult); 
+// Option A: Pull it out using .then()
+trappedResult.then(data => console.log("Extracted:", data));
+
+// Option B: Pull it out using await inside an async function
+const data = await trappedResult;
+console.log("Extracted:", data);
+

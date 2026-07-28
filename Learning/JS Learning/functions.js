@@ -616,3 +616,104 @@
 
 
 
+// console.log("Start");
+
+// setTimeout(function cb(){
+//     console.log("Callback");
+// }, 5000);
+
+// console.log("End");
+
+// let startDate = new Date().getTime();
+// let endDate = startDate;
+// while(endDate < startDate + 10000){
+//     endDate = new Date().getTime();
+// }
+
+// console.log("While Expires");
+
+
+// console.log("Start");
+
+// // Change setTimeout to setInterval
+// let intervalId = setInterval(function cb(){
+//     console.log("Callback");
+//     clearInterval(intervalId); // Stop it after the first run for comparison
+// }, 5000);
+
+// console.log("End");
+
+// let startDate = new Date().getTime();
+// let endDate = startDate;
+// while(endDate < startDate + 10000){
+//     endDate = new Date().getTime();
+// }
+
+// console.log("While Expires");
+
+
+// const person1 = { name: "John" };
+// const person2 = { name: "Paul" };
+// const person3 = { name: "Ringo" };
+
+// function greet() {
+//   console.log("Hello " + this.name);
+// }
+
+// const greetJohn = greet.bind(person1);
+
+// greetJohn();
+
+
+// (function () {
+//   let text = "Hello! I called myself.";
+//   console.log(text)
+// })();
+
+
+// let result = (function () {
+//   return 5 + 5;
+// })();
+
+// console.log(result)
+
+// (() => {
+//   let text = "Hello! I called myself.";
+//   console.log(text)
+// })();
+
+// ((name) => {
+//   let text = "Hello " + name;
+//   console.log(text)
+// })("John Doe");
+
+
+
+// const counter = (function () {
+//   let value = 0;
+//   return {
+//     increment() { value++; },
+//     get() { return value; }
+//   };
+// })();
+
+// counter.increment();
+// let x = counter.get();
+// console.log(x)
+
+
+
+
+function myCounter() {
+  let counter = 0;
+  return function() {
+    counter++;
+    return counter;
+  };
+}
+const add = myCounter();
+add();
+add();
+console.log(add());
+
+
