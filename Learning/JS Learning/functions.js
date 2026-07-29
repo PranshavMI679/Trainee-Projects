@@ -704,16 +704,28 @@
 
 
 
-function myCounter() {
-  let counter = 0;
-  return function() {
-    counter++;
-    return counter;
-  };
+// function myCounter() {
+//   let counter = 0;
+//   return function() {
+//     counter++;
+//     return counter;
+//   };
+// }
+// const add = myCounter();
+// add();
+// add();
+// console.log(add());
+
+
+const user = { name: "Charlie" };
+
+function greet(greeting, punctuation) {
+  console.log(`${greeting}, my name is ${this.name}${punctuation}`);
 }
-const add = myCounter();
-add();
-add();
-console.log(add());
 
+// Returns a new function, does not execute yet
+const greetCharlie = greet.bind(user, "Welcome");
 
+// Execute later, passing remaining arguments if needed
+greetCharlie("!"); 
+// Output: Welcome, my name is Charlie!

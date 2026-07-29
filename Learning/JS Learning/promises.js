@@ -590,14 +590,14 @@
 
 
 // 📦 You ordered the package (Promise is created and pending)
-const orderData = new Promise((resolve) => {
-  setTimeout(() => {
-    resolve("New Smartphone");
-  }, 2000);
-});
+// const orderData = new Promise((resolve) => {
+//   setTimeout(() => {
+//     resolve("New Smartphone");
+//   }, 2000);
+// });
 
-// If you stop here, the package arrives at your doorstep, 
-// but you never open the box. The data is unusable.
+// // If you stop here, the package arrives at your doorstep, 
+// // but you never open the box. The data is unusable.
 
 // orderData
 //   .then((package) => console.log("Unboxed:", package)) // "Unboxed: 🎁 New Smartphone"
@@ -663,50 +663,109 @@ const orderData = new Promise((resolve) => {
 
 
 
-function getSecretData() {
-  return new Promise((resolve) => {
-    resolve("Top Secret Code");
+// function getSecretData() {
+//   return new Promise((resolve) => {
+//     resolve("Top Secret Code");
+//   });
+// }
+
+// // 1. You run the function and save the promise to a variable
+// const trappedResult = getSecretData();
+
+// // 2. You try to print the variable directly
+// console.log(trappedResult); 
+// // Option A: Pull it out using .then()
+// trappedResult.then(data => console.log("Extracted:", data));
+
+// // Option B: Pull it out using await inside an async function
+// const data = await trappedResult;
+// console.log("Extracted:", data);
+
+// // Step 2: Consume the Promise using chaining
+// verifyInventory("laptop")
+//   .then((message) => {
+//     console.log("Success:", message); 
+//   })
+//   .catch((error) => {
+//     console.error("Error:", error.message);
+//   })
+//   .finally(() => {
+//     console.log("Inventory check completed."); // Always runs
+//   });
+
+
+
+//   console.log("Start");
+
+// setTimeout(function cb(){
+//     console.log("Callback");
+// }, 5000);
+
+// console.log("End");
+
+// let startDate = new Date().getTime();
+// let endDate = startDate;
+// while(endDate < startDate + 10000){
+//     endDate = new Date().getTime();
+// }
+
+// console.log("While Expires");
+
+
+
+
+// Simulates checking database credentials
+function checkUserLogin(username, password) {
+  return new Promise((resolve, reject) => {
+    console.log("Connecting to authentication server...");
+
+    setTimeout(() => {
+      // Setup structural pass/fail criteria
+      if (username === "admin" && password === "secret123") {
+        resolve({ userId: 101, role: "Administrator", token: "xyz_987" }); // Changes state to Fulfilled
+      } else {
+        reject(new Error("Authentication failed: Invalid username or password.")); // Changes state to Rejected
+      }
+    }, 1500); // 1.5-second network delay
   });
 }
 
-// 1. You run the function and save the promise to a variable
-const trappedResult = getSecretData();
+function runWithChaining() {
+  console.log("--- Starting .then/.catch Demo ---");
 
-// 2. You try to print the variable directly
-console.log(trappedResult); 
-// Option A: Pull it out using .then()
-trappedResult.then(data => console.log("Extracted:", data));
+  // Scenario A: Simulating Success
+  checkUserLogin("admin", "secret123")
+    .then((userData) => {
+      console.log("Success (.then): User logged in!", userData);
+    })
+    .catch((error) => {
+      console.error("Error (.catch):", error.message);
+    })
+    .finally(() => {
+      console.log("Cleanup (.finally): Connection closed for Success Demo.");
+    });
 
-// Option B: Pull it out using await inside an async function
-const data = await trappedResult;
-console.log("Extracted:", data);
-
-// Step 2: Consume the Promise using chaining
-verifyInventory("laptop")
-  .then((message) => {
-    console.log("Success:", message); 
-  })
-  .catch((error) => {
-    console.error("Error:", error.message);
-  })
-  .finally(() => {
-    console.log("Inventory check completed."); // Always runs
-  });
-
-
-
-  console.log("Start");
-
-setTimeout(function cb(){
-    console.log("Callback");
-}, 5000);
-
-console.log("End");
-
-let startDate = new Date().getTime();
-let endDate = startDate;
-while(endDate < startDate + 10000){
-    endDate = new Date().getTime();
+  // // Scenario B: Simulating Failure
+  // checkUserLogin("wrong_user", "wrong_pass")
+  //   .then((userData) => {
+  //     console.log("Success (.then):", userData);
+  //   })
+  //   .catch((error) => {
+  //     console.error("Error (.catch):", error.message);
+  //   })
+  //   .finally(() => {
+  //     console.log("Cleanup (.finally): Connection closed for Failure Demo.\n");
+  //   });
 }
 
-console.log("While Expires");
+// Execute the chaining demonstration
+runWithChaining();
+
+
+
+// Promise.allSettled{
+//   settimout = 1 sec
+//   console.log
+//   settimeout = 2 sec
+
+// }

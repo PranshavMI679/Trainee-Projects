@@ -708,17 +708,33 @@
 
 
 
-class Car {
-  constructor(name, year) {
-    this.name = name;
-    this.year = year;
-  }
-  age() {
-    const date = new Date();
-    return date.getFullYear() - this.year;
-  }
-}
+// class Car {
+//   constructor(name, year) {
+//     this.name = name;
+//     this.year = year;
+//   }
+//   age() {
+//     const date = new Date();
+//     return date.getFullYear() - this.year;
+//   }
+// }
 
-const myCar = new Car("H-i10", 2021);
-console.log("My car is " + myCar.age() + " years old.");
+// const myCar = new Car("H-i10", 2021);
+// console.log("My car is " + myCar.age() + " years old.");
+
+
+
+
+
+// Object: Keys are forced to strings
+const obj = {};
+obj[1] = 'one'; // Key becomes string '1'
+
+// Map: Keys can be literal objects or elements
+const map = new Map();
+const user = { name: 'Alex' };
+map.set(user, 'Metadata about Alex'); 
+console.log(map.get(user)); // 'Metadata about Alex'
+
+
 

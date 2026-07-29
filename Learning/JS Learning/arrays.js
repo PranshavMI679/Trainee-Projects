@@ -232,34 +232,34 @@
 
 
 
-const orderItems = [
-  { item: "Burger", price: 12, quantity: 2 },
-  { item: "Fries", price: 5, quantity: 1 },
-  { item: "Soda", price: 3, quantity: 3 }
-];
+// const orderItems = [
+//   { item: "Burger", price: 12, quantity: 2 },
+//   { item: "Fries", price: 5, quantity: 1 },
+//   { item: "Soda", price: 3, quantity: 3 }
+// ];
 
-// ✅ Correct: We capture a BRAND NEW array of identical length
-const receiptLines = orderItems.map(line => {
-  return `${line.quantity}x ${line.item} ($${line.price * line.quantity})`;
-});
+// // ✅ Correct: We capture a BRAND NEW array of identical length
+// const receiptLines = orderItems.map(line => {
+//   return `${line.quantity}x ${line.item} ($${line.price * line.quantity})`;
+// });
 
-console.log(receiptLines);
-/* Output a fresh array of strings:
-[
-  "2x Burger ($24)",
-  "1x Fries ($5)",
-  "3x Soda ($9)"
-]
-*/
+// console.log(receiptLines);
+// /* Output a fresh array of strings:
+// [
+//   "2x Burger ($24)",
+//   "1x Fries ($5)",
+//   "3x Soda ($9)"
+// ]
+// */
 
-// ✅ Correct: We crush the array down into a single final numerical value
-// The '0' at the very end is our starting point (initial accumulator value)
-const grandTotal = orderItems.reduce((runningTotal, line) => {
-  const lineCost = line.price * line.quantity;
-  return runningTotal + lineCost;
-}, 0);
+// // ✅ Correct: We crush the array down into a single final numerical value
+// // The '0' at the very end is our starting point (initial accumulator value)
+// const grandTotal = orderItems.reduce((runningTotal, line) => {
+//   const lineCost = line.price * line.quantity;
+//   return runningTotal + lineCost;
+// }, 0);
 
-console.log(grandTotal); 
+// console.log(grandTotal); 
 // Output: 38 (A single number)
 
 
@@ -279,13 +279,40 @@ console.log(grandTotal);
 
 
 
-const names = ["Alice", "Bob", "Charlie"];
+// const names = ["Alice", "Bob", "Charlie"];
 
-// Just print each name out to the screen
-names.forEach(name => console.log("Hello " + name));
+// // Just print each name out to the screen
+// names.forEach(name => console.log("Hello " + name));
 
 /* Output:
    Hello Alice
    Hello Bob
    Hello Charlie
 */
+
+
+// const fruits = ['apple', 'banana'];
+
+// const food = [...fruits]
+// console.log(food)
+
+
+// const fruits = ['apple', 'banana', 'orange', 'mango'];
+// // Grab from second-to-last item to the end
+// console.log(fruits.slice(1)); // ['orange', 'mango']
+
+
+
+// const numbers = [1, 2, 3, 4];
+
+// const total = numbers.reduce((acc, curr) => {
+//   return acc + curr; // Adds the current item to the running total
+// }, 0); // 0 is the initialValue assigned to acc on the first run
+
+// console.log(total); // 100
+
+
+// let text = "Hello World"
+// let result = text.italics()
+
+// console.log(result)
