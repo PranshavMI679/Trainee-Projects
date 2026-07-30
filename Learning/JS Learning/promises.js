@@ -715,35 +715,35 @@
 
 
 // Simulates checking database credentials
-function checkUserLogin(username, password) {
-  return new Promise((resolve, reject) => {
-    console.log("Connecting to authentication server...");
+// function checkUserLogin(username, password) {
+//   return new Promise((resolve, reject) => {
+//     console.log("Connecting to authentication server...");
 
-    setTimeout(() => {
-      // Setup structural pass/fail criteria
-      if (username === "admin" && password === "secret123") {
-        resolve({ userId: 101, role: "Administrator", token: "xyz_987" }); // Changes state to Fulfilled
-      } else {
-        reject(new Error("Authentication failed: Invalid username or password.")); // Changes state to Rejected
-      }
-    }, 1500); // 1.5-second network delay
-  });
-}
+//     setTimeout(() => {
+//       // Setup structural pass/fail criteria
+//       if (username === "admin" && password === "secret123") {
+//         resolve({ userId: 101, role: "Administrator", token: "xyz_987" }); // Changes state to Fulfilled
+//       } else {
+//         reject(new Error("Authentication failed: Invalid username or password.")); // Changes state to Rejected
+//       }
+//     }, 1500); // 1.5-second network delay
+//   });
+// }
 
-function runWithChaining() {
-  console.log("--- Starting .then/.catch Demo ---");
+// function runWithChaining() {
+//   console.log("--- Starting .then/.catch Demo ---");
 
-  // Scenario A: Simulating Success
-  checkUserLogin("admin", "secret123")
-    .then((userData) => {
-      console.log("Success (.then): User logged in!", userData);
-    })
-    .catch((error) => {
-      console.error("Error (.catch):", error.message);
-    })
-    .finally(() => {
-      console.log("Cleanup (.finally): Connection closed for Success Demo.");
-    });
+//   // Scenario A: Simulating Success
+//   checkUserLogin("admin", "secret123")
+//     .then((userData) => {
+//       console.log("Success (.then): User logged in!", userData);
+//     })
+//     .catch((error) => {
+//       console.error("Error (.catch):", error.message);
+//     })
+//     .finally(() => {
+//       console.log("Cleanup (.finally): Connection closed for Success Demo.");
+//     });
 
   // // Scenario B: Simulating Failure
   // checkUserLogin("wrong_user", "wrong_pass")
@@ -756,10 +756,10 @@ function runWithChaining() {
   //   .finally(() => {
   //     console.log("Cleanup (.finally): Connection closed for Failure Demo.\n");
   //   });
-}
+//}
 
 // Execute the chaining demonstration
-runWithChaining();
+//runWithChaining();
 
 
 
@@ -769,3 +769,37 @@ runWithChaining();
 //   settimeout = 2 sec
 
 // }
+
+
+const checkBattery = new Promise((resolve, reject) => {
+    let batteryLevel = 85; // Simulating a status
+
+    if (batteryLevel > 20) {
+        resolve("Battery OK"); // Triggers success -> Changes state to FULFILLED
+    } else {
+        reject("Low Battery"); // Triggers failure -> Changes state to REJECTED
+    }
+});
+
+// checkBattery
+//     .then((message) => {
+//         // This ONLY runs if resolve() was triggered
+//         console.log("Success: " + message); 
+//     })
+//     .catch((error) => {
+//         // This ONLY runs if reject() was triggered
+//         console.error("Error: " + error); 
+//     });
+
+async function checkStatus() {
+    try {
+        // 'await' pauses execution and extracts the data directly from resolve()
+        const message = await checkBattery; 
+        console.log("Success: " + message);
+    } catch (error) {
+        // If reject() is triggered, execution instantly jumps here
+        console.error("Error: " + error);
+    }
+}
+
+checkStatus();

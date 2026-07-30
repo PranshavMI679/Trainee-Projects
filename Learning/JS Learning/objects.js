@@ -727,14 +727,28 @@
 
 
 // Object: Keys are forced to strings
-const obj = {};
-obj[1] = 'one'; // Key becomes string '1'
+// const obj = {};
+// obj[1] = 'one'; // Key becomes string '1'
 
-// Map: Keys can be literal objects or elements
-const map = new Map();
-const user = { name: 'Alex' };
-map.set(user, 'Metadata about Alex'); 
-console.log(map.get(user)); // 'Metadata about Alex'
+// // Map: Keys can be literal objects or elements
+// const map = new Map();
+// const user = { name: 'Alex' };
+// map.set(user, 'Metadata about Alex'); 
+// console.log(map.get(user)); // 'Metadata about Alex'
 
 
+class Car {
+  constructor(brand) {
+    this.carname = brand;
+  }
+  get cnam() {
+    return this.carname;
+  }
+  set cnam(x) {
+    this.carname = x;
+  }
+}
 
+const myCar = new Car("Ford");
+
+console.log(myCar.cnam);

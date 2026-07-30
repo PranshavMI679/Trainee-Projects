@@ -245,3 +245,22 @@
 // 	};
 // 	return errorMessages[n] || 101;
 // }
+
+
+
+//------------------Edabit Questions
+//----------medium
+
+//----------Remove Trailing and Leading Zeros
+// function removeLeadingTrailing(n) {
+// 	let num = Math.abs(n)
+// 	return num.toString()
+// }
+
+//-------------Reverse words to String
+// function reverseWords(string) {
+// 	return string.split(" ").reverse().join(" ")
+// }
+
+
+// rough code(fulfill result) -> optimized code ->clean code(simplified code)

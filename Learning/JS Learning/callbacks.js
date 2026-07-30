@@ -260,14 +260,33 @@
 // myDisplayer(result);
 
 
-function myDisplayer(some) {
-  console.log(some);
+// function myDisplayer(some) {
+//   console.log(some);
+// }
+
+// function myCalculator(num1, num2, myCallback) {
+//   let sum = num1 + num2;
+//   myCallback(sum);
+// }
+
+// myCalculator(5, 5, myDisplayer);
+
+
+
+function divideByHalf(sum){
+  console.log(Math.floor(sum / 2));
 }
 
-function myCalculator(num1, num2, myCallback) {
-  let sum = num1 + num2;
-  myCallback(sum);
+function multiplyBy2(sum){
+  console.log(sum * 2);
 }
 
-myCalculator(5, 5, myDisplayer);
+function operationOnSum(num1,num2,operation){
+  var sum = num1 + num2;
+  operation(sum);
+}
+
+operationOnSum(3, 3, divideByHalf); // Outputs 3
+
+operationOnSum(5, 5, multiplyBy2); // Outputs 20
 

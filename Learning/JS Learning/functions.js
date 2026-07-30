@@ -717,15 +717,37 @@
 // console.log(add());
 
 
-const user = { name: "Charlie" };
+// const user = { name: "Charlie" };
 
-function greet(greeting, punctuation) {
-  console.log(`${greeting}, my name is ${this.name}${punctuation}`);
+// function greet(greeting, punctuation) {
+//   console.log(`${greeting}, my name is ${this.name}${punctuation}`);
+// }
+
+// // Returns a new function, does not execute yet
+// const greetCharlie = greet.bind(user, "Welcome");
+
+// // Execute later, passing remaining arguments if needed
+// greetCharlie("!"); 
+// // Output: Welcome, my name is Charlie!
+
+
+
+
+//Currying - Curried Function
+
+function curriedAdd(a) {
+    return function(b) {
+        return function(c) {
+            return a + b + c;
+        };
+    };
 }
 
-// Returns a new function, does not execute yet
-const greetCharlie = greet.bind(user, "Welcome");
+// Called like this:
+console.log(curriedAdd(2)(3)(5)); // 10
 
-// Execute later, passing remaining arguments if needed
-greetCharlie("!"); 
-// Output: Welcome, my name is Charlie!
+
+const arrowCurriedAdd = a => b => c => a + b + c;
+
+console.log(arrowCurriedAdd(2)(3)(5)); // 10
+

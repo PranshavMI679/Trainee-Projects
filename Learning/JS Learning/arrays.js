@@ -316,3 +316,29 @@
 // let result = text.italics()
 
 // console.log(result)
+
+
+
+// const numbers = [2, 45, 30, 100];
+// console.log(numbers.reduce(getSum));
+
+// function getSum(total, num) {
+//    console.log(total)
+//   return total - num;
+// }
+
+
+// const arr1 = [1, 2, 3];
+// const arr2 = [4, 5, 6];
+// const arr3 = [...arr1, ...arr2];
+// console.log(arr3)
+
+
+
+// Create an Array
+const fruits = ["Banana", "Orange", "Apple", "Mango"];
+
+// Sort the Array
+const fruit2 = fruits.toSorted();
+
+console.log(fruit2)
