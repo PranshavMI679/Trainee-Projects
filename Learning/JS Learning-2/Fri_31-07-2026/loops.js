@@ -69,9 +69,12 @@
 // }
 
 
-const fruits = ['apple', 'banana', 'orange'];
+// const fruits = ['apple', 'banana', 'orange'];
 
-for (const values in fruits) {
-  console.log(values);        // Prints: "0", "1", "2" (as strings!)
-  console.log(typeof values); // Prints: "string"
-}
+// for (const values in fruits) {
+//   console.log(values);        // Prints: "0", "1", "2" (as strings!)
+//   console.log(typeof values); // Prints: "string"
+// }
+
+
+
