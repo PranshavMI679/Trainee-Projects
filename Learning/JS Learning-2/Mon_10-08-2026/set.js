@@ -30,15 +30,17 @@
 
 
 // A Greet Function
-function greet(name, callback) {
-  callback("Hello " + name);
-}
+// function greet(name, callback) {
+//   callback("Hello " + name);
+// }
 
-// A Display Function
-function display(message) {
-  console.log(message);
-}
+// // A Display Function
+// function display(message) {
+//   console.log(message);
+// }
 
-// Call greet() with a callback function (display)
-greet("John", display);
+// // Call greet() with a callback function (display)
+// greet("John", display);
+
+
 

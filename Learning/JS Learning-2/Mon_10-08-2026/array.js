@@ -129,13 +129,23 @@
 
 
 
-function getScores() {
-  return [70, 80, 90];
-}
-let scores = getScores();
+// function getScores() {
+//   return [70, 80, 90];
+// }
+// let scores = getScores();
 
-let x = scores[0],
-  y = scores[1],
-  z = scores[2];
+// let x = scores[0],
+//   y = scores[1],
+//   z = scores[2];
 
-console.log({ x, y, z });
+// console.log({ x, y, z });
+
+
+// const myArr = [[1, 2, 3], [4, 5], 6];
+// const newArr = myArr.flat().map(x => [x, x * 10]);
+// console.log(newArr)
+
+
+const myArr = [[1, 2, 3], [4, 5], [6]];
+const newArr = myArr.flatMap(x => [x, x * 10]);
+console.log(newArr)
