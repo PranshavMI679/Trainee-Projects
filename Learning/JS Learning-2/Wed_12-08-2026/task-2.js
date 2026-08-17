@@ -170,7 +170,7 @@ function pattern3(nums) {
     console.log(text);
   }
 }
-//pattern3(3);
+pattern3(3);
 
 //Results
 // 5 5 5 5 5 5 5 5 5 
@@ -185,28 +185,47 @@ function pattern3(nums) {
 
 
 //4
-function pattern4(rows){
-  let value = (rows**2)
-  let i = 1
-  let text = ""
-  while(i<=rows){
-    let num = i.toString()
-    let numpad = num.padStart(3, "0") 
-    //text = text + numpad + " "
-    i++
-    if(i>=rows){
-      text = text + numpad + " "
+function pattern4(rows) {
+  for (let r = 0; r < rows; r++) {
+    let text = "";
+    for (let c = 0; c < rows; c++) {
+      // 1. Find which "Layer" we are in (0 is outer, 1 is next inside, etc.)
+      // We find this by looking at how close we are to the nearest edge
+      let distTop = r;
+      let distBottom = rows - 1 - r;
+      let distLeft = c;
+      let distRight = rows - 1 - c;
+      let layer = Math.min(distTop, distBottom, distLeft, distRight);
+      // 2. Find the dimensions of the "inner box" for this layer
+      let innerSize = rows - (2 * layer);
+      // 3. Find the starting number of this specific layer
+      // Formula: Total spots minus the spots of the inner box, plus 1
+      let startNum = (rows * rows) - (innerSize * innerSize) + 1;
+      let value;
+      // 4. Calculate the exact number based on which wall we are standing on
+      if (r === layer) {
+        // We are on the TOP wall of this layer (counting up left-to-right)
+        value = startNum + (c - layer);
+      } 
+      else if (c === rows - 1 - layer) {
+        // We are on the RIGHT wall (counting up top-to-bottom)
+        value = startNum + (innerSize - 1) + (r - layer);
+      } 
+      else if (r === rows - 1 - layer) {
+        // We are on the BOTTOM wall (counting up right-to-left)
+        value = startNum + 2 * (innerSize - 1) + ((rows - 1 - layer) - c);
+      } 
+      else {
+        // We are on the LEFT wall (counting up bottom-to-top)
+        value = startNum + 3 * (innerSize - 1) + ((rows - 1 - layer) - r);
+      }
+      // 5. Add it to our text string with your padding trick!
+      text += value.toString().padStart(3, "0") + "  ";
     }
-    else{text = text + (numpad) + " "}
-    console.log(text)
+    console.log(text);
   }
 }
-pattern4(3)
-
-//result
-// 001 002 003
-// 008 009 004
-// 007 006 005
+pattern4(4);
 
 //result
 // 001  002  003  004  005  006  007  008  009  010
@@ -219,3 +238,114 @@ pattern4(3)
 // 030  059  080  079  078  077  076  075  050  017
 // 029  058  057  056  055  054  053  052  051  018
 // 028  027  026  025  024  023  022  021  020  019
+
+
+//5
+function pattern5(rows){ 
+    for(let i=rows; i>=1; i--){ 
+        let text = "" 
+        for(let j = 1; j<=i; j++){ 
+            text = text + String.fromCharCode(64+j) 
+        } 
+        for(let s = 1; s <= (rows - i) * 2; s++){
+            text = text + "*"
+        }
+        for(let j = i; j >= 1; j--){
+          text = text + String.fromCharCode(64+j)
+        }
+        console.log(text) 
+    } 
+} 
+//pattern5(5)
+
+//result
+// ABCDEEDCBA
+// ABCD**DCBA
+// ABC****CBA
+// AB******BA
+// A********A
+
+
+//6
+function pattern6(rows) {
+    for (let i = rows; i>=1; i--){
+    let text = ""
+    for (let space = 1; space <= rows - i; space++) {
+      text = text + " ";
+    }
+    for (let j = 1; j <= i; j++) {
+        if(j==1 || j == i){
+            text = text + String.fromCharCode(64 + i) + " "
+        }
+        else{text += "  ";}
+    }
+    console.log(text);
+  }
+  for (let i = 1; i <= rows; i++) {
+    let text = ""
+    for (let space = 1; space <= rows - i; space++) {
+      text = text + " ";
+    }
+    for (let j = 1; j <= i; j++) {
+        if(j==1 || j == i){
+            text = text + String.fromCharCode(64 + i) + " "
+        }
+        else{text += "  ";}
+    }
+    console.log(text);
+  }
+}
+//pattern6(5)
+
+//Result
+// E       E
+//  D     D
+//   C   C
+//    B B
+//     A
+//    B B
+//   C   C
+//  D     D
+// E       E
+
+
+//7
+function pattern7(nums){
+    for(let i=1; i<=nums; i++){
+        let text = ""
+        for(let j=1; j<=i; j++){
+            text = text + (i**j) + " "
+        }
+        console.log(text)
+    }
+}
+//pattern7(5)
+
+//Result
+// 1
+// 2 4
+// 3 9 27
+// 4 16 64 256
+// 5 25 125 625 3125
+
+//8
+function pattern8(nums) {
+    for (let i = 1; i <= nums; i++) {
+        let text = "";
+        let currentNumber = i; 
+        for (let j = 1; j <= i; j++) {
+            text = text + currentNumber + " ";
+            let gap = i - j;
+            currentNumber = currentNumber + gap;
+        }
+        console.log(text);
+    }
+}
+//pattern8(4);
+//Result
+// 1
+// 2 3
+// 3 5 6
+// 4 7 9 10
+// 5 9 12 14 15
+// 6 11 15 18 20 21

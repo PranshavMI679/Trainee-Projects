@@ -34,3 +34,14 @@ function printit(c){
 // let nums = [1,2,3,4,5]
 // let value = nums.reduce((acc,curr)=> acc+curr,10)
 // console.log(value)
+
+
+
+// const items = [1, [2, 3, 4]];
+// // Multiply each number and pack into a small pair
+// const flatMapped = items.flatMap(num => [num, num * 10]);
+// console.log(flatMapped); 
+
+const numbers = [25, 16, 9, 29];
+
+console.log("First number over 18 has index " + numbers.findIndex(x => x > 18));
