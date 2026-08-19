@@ -2,7 +2,7 @@
 // When solving using predefined methods and functios - use only and only String methods strictly.
 // String methods which only return string or single value - no array no object allowed as result (split, match, matchAll)
 // not even regexp or any thing else - just pure string related tasks/questions.
-// you can use only arrays not array methods for normal solutions.
+// you can use only arrays not string or array or object methods for normal solutions.
 
 str = `Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; 
     Vestibulum id turpis vehicula magna interdum venenatis. Sed pulvinar laoreet turpis quis cursus. 
@@ -22,7 +22,7 @@ function question1(str){
     let len = str.length
     return len
 }
-console.log(question1(str))
+//console.log(question1(str))
 
 
 //2 - Merge "str" & "str1".
@@ -39,15 +39,35 @@ function add(a, b){
 
 //3 - Get all the same words from the merge of "str" & "str1".(find the words which are in str1 from str)]
 // Normal
-// function normalQuestion3(str, str1){
-//     let result = ""
-//     let word = ""
+function normalQuestion3(str, str1) {
+    let result = "";
+    let word = "";
 
-//     for(let i=0; i<=str1.length; i++){
-
-//     }
-// }
-// normalQuestion3(str, str1)
+    for (let i = 0; i <= str1.length; i++) {
+        let char = str1[i];
+        if (char === ' ' || i === str1.length) {
+            let found = false;
+            for (let j = 0; j <= str.length - word.length; j++) {
+                let match = true;
+                for (let k = 0; k < word.length; k++) {
+                    if (str[j + k] !== word[k]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) { found = true; break; }
+            }
+            if (word !== "" && found) {
+                result = result + word + " ";
+            }
+            word = "";
+        } else if (char !== ',' && char !== '.') { 
+            word = word + char;
+        }
+    }
+    return result;
+}
+//console.log(normalQuestion3(str, str1))
 
 //Method
 function question3(str, str1) {
@@ -87,8 +107,7 @@ function normalQuestion4and5(text, word) {
     }
     return "Not found";
 }
-normalQuestion4and5(text, "Class")
-
+console.log(normalQuestion4and5(text, "Class"))
 
 //method
 function question4and5(text, word) {
@@ -102,6 +121,37 @@ function question4and5(text, word) {
 
 
 //6 - Find All unique words from “str1” in comparison of “str”.
+//Normal
+function normalQuestion6(str, str1) {
+    let result = "";
+    let word = "";
+    
+    for (let i = 0; i <= str1.length; i++) {
+        let char = str1[i];
+        if (char === ' ' || i === str1.length) {
+            let found = false;
+            for (let j = 0; j <= str.length - word.length; j++) {
+                let match = true;
+                for (let k = 0; k < word.length; k++) {
+                    if (str[j + k] !== word[k]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) { found = true; break; }
+            }
+            if (word !== "" && !found) {
+                result = result + word + " ";
+            }
+            word = "";
+        } else if (char !== ',' && char !== '.') { 
+            word = word + char;
+        }
+    }
+    return result;
+}
+console.log(normalQuestion6(str, str1))
+
 //Method
 function question6(str, str1) {
     let result = "";
@@ -121,14 +171,50 @@ function question6(str, str1) {
     return result;
 }
 const string = question6(str, str1)
-console.log(string)
+//console.log(string)
+
 
 //7 - List all unique words & how many times it’s used.
-// result string which we gets from ques-6 - use that and solve this 
-// Dont change the code - correct it
+// result string which we gets from ques-6 - use that and solve this
+// Normal
+function normalQuestion7(text) {
+    let words = [];
+    let counts = [];
+    let total = 0;
+    let word = "";
+    
+    for (let i = 0; i <= text.length; i++) {
+        if (text[i] === ' ' || i === text.length) {
+            if (word !== "") {
+                let foundIndex = -1;
+                for (let j = 0; j < total; j++) {
+                    if (words[j] === word) {
+                        foundIndex = j;
+                        break; 
+                    }
+                }
+                if (foundIndex !== -1) {
+                    counts[foundIndex] = counts[foundIndex] + 1;
+                } else {
+                    words[total] = word;
+                    counts[total] = 1;
+                    total++;
+                }
+            }
+            word = "";
+        } else {
+            word = word + text[i];
+        }
+    }
+    let result = "";
+    for (let i = 0; i < total; i++) {
+        result = result + words[i] + " = " + counts[i] + "\n";
+    }
+    return result;
+}
+console.log(normalQuestion7(string));
 
 //method
-
 function question7(uni) {
     let total = 0;
     let word = "";
@@ -153,30 +239,5 @@ function question7(uni) {
 }
     return result;
 }
-console.log(question7(string));
-
-
-// function question7(uni){
-// let total = 0
-// let word = ""
-
-// for(let i = 0; i<=uni.length; i++){
-//     let char = uni.charAt(i)
-//    if (char === ' ' || i === uni.length) {
-//     if (word !== "") {
-//         total = 1; 
-//         console.log(`${word} = ${total}`);
-//         }
-//     word = ""; 
-//     }
-//     else {
-//         word = word + char
-//     }
-//     for(let value of string){
-//         let wordCount = 0
-
-//     }
-// }
-// }
-// console.log(question7(string))
+//console.log(question7(string));
 
