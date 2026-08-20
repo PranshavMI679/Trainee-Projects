@@ -191,50 +191,56 @@ function findWord(a, b, word){
 
 
 //normal
-function normalFindWord(a, b, word){
-	let counts = []
-	for(let i=0; i<b.length; i++){
-		let newArr = []
-		let tempString = ""
-		let str = a[i]
-		for(let j=0; j<str.length; j++){
-			if(str[j] != ' '){
-				tempString = tempString + str[j]
-			}
-			else{                       
-				if (tempString != "") {
-					newArr[newArr.length] = tempString
-				}
-				tempString = "";             
-			}
-		}
-		if (tempString != "") {
-			newArr[newArr.length] = tempString
-		}
-		counts[counts.length] = newArr.length
-	}
-	for(let i=0; i<b.length; i++){
-		let newArr = []
-		let tempString = ""
-		let str = b[i]
-		for(let j=0; j<str.length; j++){
-			if(str[j] != ' '){
-				tempString = tempString + str[j]
-			}
-			else{                       
-				if (tempString != "") {
-					newArr[newArr.length] = tempString
-				}
-				tempString = "";             
-			}
-		}
-		if (tempString != "") {
-			newArr[newArr.length] = tempString
-		}
-		counts[counts.length] = newArr.length
-	}
+function normalFindWord(a, b, word) {
+  for (let i = 0; i < a.length; i++) {
+    let str = a[i];
+    let tempString = "";
+    let isFound = false;
+
+    for (let j = 0; j < str.length; j++) {
+      if (str[j] != ' ') {
+        tempString = tempString + str[j];
+      } else {
+        if (tempString === word) {
+          isFound = true;
+        }
+        tempString = "";
+      }
+    }
+    if (tempString === word) {
+      isFound = true;
+    }
+
+    if (isFound) {
+      console.log(`The word "${word}" was found in "${a[i]}" string of array a`);
+    }
+  }
+
+  for (let i = 0; i < b.length; i++) {
+    let str = b[i];
+    let tempString = "";
+    let isFound = false;
+
+    for (let j = 0; j < str.length; j++) {
+      if (str[j] != ' ') {
+        tempString = tempString + str[j];
+      } else {
+        if (tempString === word) {
+          isFound = true;
+        }
+        tempString = "";
+      }
+    }
+    if (tempString === word) {
+      isFound = true;
+    }
+
+    if (isFound) {
+      console.log(`The word "${word}" was found in "${b[i]}" string of array b`);
+    }
+  }
 }
-console.log(normalFindWord(arr, arr1, "arcu"))
+normalFindWord(arr, arr1, "arcu");
 
 
 
