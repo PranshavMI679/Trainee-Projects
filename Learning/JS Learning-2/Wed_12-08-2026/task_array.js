@@ -188,28 +188,16 @@ function normalWordCount(array){
 }
 //console.log(normalWordCount(arr))
 
+//correct this code
 //4 - Get the string from an array which has given word or words. [ print that string & in both array with array name ]
 //method
-function findWord(a, b, word){
-	let smallWord = word.toLowerCase()
-	let result = []
-	for(let i=0; i<a.length; i++){
-		let str = a[i].toLowerCase()
-		let found = str.split(" ").filter(item => item === smallWord ).length
-		if(found > 0){
-			//console.log(`The word "${word}" was found in "${a[i]}" string of array a`)
-			result.push(a[i])
-		}
-	}
-	for(let i=0; i<b.length; i++){
-		let str = b[i].toLowerCase()
-		let found = str.split(" ").filter(item => item === smallWord).length
-		if(found > 0){
-			//console.log(`The word "${word}" was found in "${b[i]}" string of array b`)
-			result.push(b[i])
-		}
-	}
-	return result
+function findWord(a, b, word) {
+    let smallWord = word.toLowerCase();
+
+    let matchesA = a.filter(str => str.toLowerCase().split(" ").includes(smallWord));
+    let matchesB = b.filter(str => str.toLowerCase().split(" ").includes(smallWord));
+
+    return [...matchesA, ...matchesB];
 }
 //console.log(findWord(arr, arr1, "arcu"))
 
@@ -295,7 +283,9 @@ function normalDuplicate(a, b){
 
 
 
-//correct this code the same way - dont chnage it
+
+let word = "donec".toLowerCase()
+
 function filter(array, callback){
     let result = [];
     for(let i=0; i<array.length; i++){
@@ -305,11 +295,7 @@ function filter(array, callback){
     }
     return result;
 }
-
-function wordTask(array, searchWord) {
-	let word = searchWord.toLowerCase()
-			let result = []
-    let matchedArray = filter(array, currStr => {
+const myCallback = (currStr) => {
         let tempString = "";
 		let str = currStr.toLowerCase()
         for (let j = 0; j < str.length; j++) {
@@ -327,11 +313,5 @@ function wordTask(array, searchWord) {
             return true;
         }
         return false;
-    });
-    for (let i = 0; i < matchedArray.length; i++) {
-        //console.log("Found word in sentence: " + matchedArray[i]);
-		result[result.length] = macthedArray[i]
-    }
-	return result
-}
-console.log(wordTask(arr1, "arcu"));
+};
+console.log(filter(arr1, myCallback));
